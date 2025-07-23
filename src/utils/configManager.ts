@@ -1,6 +1,6 @@
 import path from 'path';
 import os from 'os';
-import { Fs } from 'fs-extra';
+import fs from 'fs-extra';
 
 const GLOBAL_CONFIG_DIR = path.join(os.homedir(), '.config', 'vecna');
 const GLOBAL_CONFIG_PATH = path.join(GLOBAL_CONFIG_DIR, 'config.json');
@@ -22,22 +22,22 @@ export interface GlobalConfig {
     projects: ProjectConfig[];
 }
 
-export const configManager = (fs: Fs) => ({
+export const configManager = (fsInstance: typeof fs) => ({
     ensureGlobalConfig: async (): Promise<void> => {
-        await fs.ensureDir(GLOBAL_CONFIG_DIR);
-        const configExists = await fs.pathExists(GLOBAL_CONFIG_PATH);
+        await fsInstance.ensureDir(GLOBAL_CONFIG_DIR);
+        const configExists = await fsInstance.pathExists(GLOBAL_CONFIG_PATH);
         if (!configExists) {
-            await fs.writeJson(GLOBAL_CONFIG_PATH, { projects: [] }, { spaces: 2 });
+            await fsInstance.writeJson(GLOBAL_CONFIG_PATH, { projects: [] }, { spaces: 2 });
         }
     },
 
     readGlobalConfig: async (): Promise<GlobalConfig> => {
-        await configManager(fs).ensureGlobalConfig();
-        return await fs.readJson(GLOBAL_CONFIG_PATH);
+        await configManager(fsInstance).ensureGlobalConfig();
+        return await fsInstance.readJson(GLOBAL_CONFIG_PATH);
     },
 
     updateGlobalConfig: async (projectConfig: ProjectConfig): Promise<void> => {
-        const config = await configManager(fs).readGlobalConfig();
+        const config = await configManager(fsInstance).readGlobalConfig();
         const projectIndex = config.projects.findIndex(p => p.name === projectConfig.name);
 
         if (projectIndex > -1) {
@@ -46,13 +46,13 @@ export const configManager = (fs: Fs) => ({
             config.projects.push(projectConfig);
         }
 
-        await fs.writeJson(GLOBAL_CONFIG_PATH, config, { spaces: 2 });
+        await fsInstance.writeJson(GLOBAL_CONFIG_PATH, config, { spaces: 2 });
     },
 
     readLocalConfig: async (): Promise<ProjectConfig | null> => {
         const localConfigPath = path.join(process.cwd(), LOCAL_CONFIG_FILENAME);
         try {
-            return await fs.readJson(localConfigPath);
+            return await fsInstance.readJson(localConfigPath);
         } catch (error) {
             return null;
         }
@@ -64,6 +64,6 @@ export const configManager = (fs: Fs) => ({
             ...config,
             path: process.cwd(),
         };
-        await fs.writeJson(localConfigPath, projectConfig, { spaces: 2 });
+        await fsInstance.writeJson(localConfigPath, projectConfig, { spaces: 2 });
     },
 });

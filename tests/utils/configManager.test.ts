@@ -1,26 +1,26 @@
 import { configManager, GlobalConfig } from '../../src/utils/configManager';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
-import { Fs } from 'fs-extra';
+import fs from 'fs-extra';
 
 describe('configManager', () => {
-    let mockFs: DeepMockProxy<Fs>;
+    let mockFs: DeepMockProxy<typeof fs>;
     let manager: ReturnType<typeof configManager>;
 
     beforeEach(() => {
-        mockFs = mockDeep<Fs>();
+        mockFs = mockDeep<typeof fs>();
         manager = configManager(mockFs);
     });
 
     describe('ensureGlobalConfig', () => {
         it('should create global config file if it does not exist', async () => {
-            mockFs.pathExists.mockResolvedValue(false);
+            mockFs.pathExists.mockResolvedValue(false as any);
             await manager.ensureGlobalConfig();
             expect(mockFs.ensureDir).toHaveBeenCalled();
             expect(mockFs.writeJson).toHaveBeenCalledWith(expect.any(String), { projects: [] }, { spaces: 2 });
         });
 
         it('should not create global config if it exists', async () => {
-            mockFs.pathExists.mockResolvedValue(true);
+            mockFs.pathExists.mockResolvedValue(true as any);
             await manager.ensureGlobalConfig();
             expect(mockFs.writeJson).not.toHaveBeenCalled();
         });
@@ -28,8 +28,8 @@ describe('configManager', () => {
 
     describe('readGlobalConfig', () => {
         it('should read and return the global config', async () => {
-            const testConfig: GlobalConfig = { projects: [{ name: 'test-project', path: '/tmp', linter: {}, test: {} }] };
-            mockFs.pathExists.mockResolvedValue(true);
+            const testConfig: GlobalConfig = { projects: [{ name: 'test-project', path: '/tmp' }] };
+            mockFs.pathExists.mockResolvedValue(true as any);
             mockFs.readJson.mockResolvedValue(testConfig);
 
             const config = await manager.readGlobalConfig();
@@ -44,7 +44,7 @@ describe('configManager', () => {
             const initialConfig: GlobalConfig = { projects: [] };
             const newProject = { name: 'new-project', path: '/tmp/new' };
 
-            mockFs.pathExists.mockResolvedValue(true);
+            mockFs.pathExists.mockResolvedValue(true as any);
             mockFs.readJson.mockResolvedValue(initialConfig);
 
             await manager.updateGlobalConfig(newProject);
