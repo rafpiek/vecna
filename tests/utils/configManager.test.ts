@@ -11,14 +11,14 @@ describe('configManager', () => {
     });
 
     it('should ensure global config file exists, creating it if not present', async () => {
-        mockedFs.pathExists.mockResolvedValue(false);
+        mockedFs.pathExists.mockResolvedValue(false as any);
         await ensureGlobalConfig();
         expect(mockedFs.ensureDir).toHaveBeenCalled();
         expect(mockedFs.writeJson).toHaveBeenCalledWith(expect.any(String), { projects: [] }, { spaces: 2 });
     });
 
     it('should not create global config if it exists', async () => {
-        mockedFs.pathExists.mockResolvedValue(true);
+        mockedFs.pathExists.mockResolvedValue(true as any);
         await ensureGlobalConfig();
         expect(mockedFs.writeJson).not.toHaveBeenCalled();
     });

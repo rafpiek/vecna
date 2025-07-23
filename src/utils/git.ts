@@ -1,6 +1,6 @@
 import simpleGit, { SimpleGit } from 'simple-git';
 
-const git: SimpleGit = simpleGit();
+export const git: SimpleGit = simpleGit();
 
 interface ModifiedFiles {
     committed: string[];
