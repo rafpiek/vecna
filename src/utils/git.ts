@@ -1,20 +1,20 @@
-import simpleGit, { SimpleGit } from 'simple-git';
+import { SimpleGit } from 'simple-git';
 
-export const git: SimpleGit = simpleGit();
-
-interface ModifiedFiles {
+export interface ModifiedFiles {
     committed: string[];
     uncommitted: string[];
 }
 
-export const getModifiedFiles = async (mainBranch: string = 'main'): Promise<ModifiedFiles> => {
-    const committed = (await git.diff(['--name-only', `${mainBranch}...HEAD`])).split('\n').filter(Boolean);
+export const gitUtils = (git: SimpleGit) => ({
+    getModifiedFiles: async (mainBranch: string = 'main'): Promise<ModifiedFiles> => {
+        const committed = (await git.diff(['--name-only', `${mainBranch}...HEAD`])).split('\n').filter(Boolean);
 
-    const status = await git.status();
-    const uncommitted = status.files.map(file => file.path);
+        const status = await git.status();
+        const uncommitted = status.files.map(file => file.path);
 
-    return {
-        committed,
-        uncommitted
-    };
-};
+        return {
+            committed,
+            uncommitted
+        };
+    }
+});

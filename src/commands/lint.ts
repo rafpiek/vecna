@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
 import { spawn } from 'child_process';
-import { getModifiedFiles } from '../utils/git';
-import { readLocalConfig } from '../utils/configManager';
+import { Command } from 'commander';
+import { configManager } from '../utils/configManager';
+import { gitUtils } from '../utils/git';
 
-const program = new Command();
+type ConfigManager = ReturnType<typeof configManager>;
+type GitUtils = ReturnType<typeof gitUtils>;
 
 const runLinter = (linter: string, files: string[], fix: boolean) => {
     const args = fix ? [...files, '--fix'] : files;
@@ -18,39 +19,43 @@ const runLinter = (linter: string, files: string[], fix: boolean) => {
     });
 };
 
-program
-    .command('all')
-    .option('-f, --fix', 'Automatically fix issues')
-    .option('-e, --uncommitted', 'Lint uncommitted changes only')
-    .option('-c, --committed', 'Lint committed changes against main branch')
-    .action(async (options) => {
-        const config = await readLocalConfig();
-        if (!config) {
-            console.error('No .vecna.json found. Run "vecna setup" first.');
-            return;
-        }
+export default (config: ConfigManager, git: GitUtils) => {
+    const program = new Command();
 
-        const { committed, uncommitted } = await getModifiedFiles();
-        let filesToLint: string[] = [];
+    program
+        .command('all')
+        .option('-f, --fix', 'Automatically fix issues')
+        .option('-e, --uncommitted', 'Lint uncommitted changes only')
+        .option('-c, --committed', 'Lint committed changes against main branch')
+        .action(async (options) => {
+            const localConfig = await config.readLocalConfig();
+            if (!localConfig) {
+                console.error('No .vecna.json found. Run "vecna setup" first.');
+                return;
+            }
 
-        if (options.uncommitted) {
-            filesToLint = uncommitted;
-        } else if (options.committed) {
-            filesToLint = committed;
-        } else {
-            filesToLint = [...committed, ...uncommitted];
-        }
+            const { committed, uncommitted } = await git.getModifiedFiles();
+            let filesToLint: string[] = [];
 
-        const jsFiles = filesToLint.filter(f => /\.(js|ts)x?$/.test(f));
-        const rbFiles = filesToLint.filter(f => /\.rb$/.test(f));
+            if (options.uncommitted) {
+                filesToLint = uncommitted;
+            } else if (options.committed) {
+                filesToLint = committed;
+            } else {
+                filesToLint = [...committed, ...uncommitted];
+            }
 
-        if (config.linter?.js && jsFiles.length > 0) {
-            runLinter(config.linter.js, jsFiles, options.fix);
-        }
+            const jsFiles = filesToLint.filter(f => /\.(js|ts)x?$/.test(f));
+            const rbFiles = filesToLint.filter(f => /\.rb$/.test(f));
 
-        if (config.linter?.rb && rbFiles.length > 0) {
-            runLinter(config.linter.rb, rbFiles, options.fix);
-        }
-    });
+            if (localConfig.linter?.js && jsFiles.length > 0) {
+                runLinter(localConfig.linter.js, jsFiles, options.fix);
+            }
 
-program.parse(process.argv);
+            if (localConfig.linter?.rb && rbFiles.length > 0) {
+                runLinter(localConfig.linter.rb, rbFiles, options.fix);
+            }
+        });
+
+    program.parse(process.argv.slice(2));
+}

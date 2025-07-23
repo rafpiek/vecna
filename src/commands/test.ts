@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
 import { spawn } from 'child_process';
-import { getModifiedFiles } from '../utils/git';
-import { readLocalConfig } from '../utils/configManager';
+import { Command } from 'commander';
+import { configManager } from '../utils/configManager';
+import { gitUtils } from '../utils/git';
 
-const program = new Command();
+type ConfigManager = ReturnType<typeof configManager>;
+type GitUtils = ReturnType<typeof gitUtils>;
 
 const runTests = (runner: string, files: string[]) => {
     const process = spawn(runner, files, { stdio: 'inherit' });
@@ -17,33 +18,37 @@ const runTests = (runner: string, files: string[]) => {
     });
 };
 
-program
-    .command('all')
-    .option('-e, --uncommitted', 'Test uncommitted changes only')
-    .option('-c, --committed', 'Test committed changes against main branch')
-    .action(async (options) => {
-        const config = await readLocalConfig();
-        if (!config) {
-            console.error('No .vecna.json found. Run "vecna setup" first.');
-            return;
-        }
+export default (config: ConfigManager, git: GitUtils) => {
+    const program = new Command();
 
-        const { committed, uncommitted } = await getModifiedFiles();
-        let filesToTest: string[] = [];
+    program
+        .command('all')
+        .option('-e, --uncommitted', 'Test uncommitted changes only')
+        .option('-c, --committed', 'Test committed changes against main branch')
+        .action(async (options) => {
+            const localConfig = await config.readLocalConfig();
+            if (!localConfig) {
+                console.error('No .vecna.json found. Run "vecna setup" first.');
+                return;
+            }
 
-        if (options.uncommitted) {
-            filesToTest = uncommitted;
-        } else if (options.committed) {
-            filesToTest = committed;
-        } else {
-            filesToTest = [...committed, ...uncommitted];
-        }
+            const { committed, uncommitted } = await git.getModifiedFiles();
+            let filesToTest: string[] = [];
 
-        const rbTestFiles = filesToTest.filter(f => /_spec\.rb$/.test(f));
+            if (options.uncommitted) {
+                filesToTest = uncommitted;
+            } else if (options.committed) {
+                filesToTest = committed;
+            } else {
+                filesToTest = [...committed, ...uncommitted];
+            }
 
-        if (config.test?.rb && rbTestFiles.length > 0) {
-            runTests(config.test.rb, rbTestFiles);
-        }
-    });
+            const rbTestFiles = filesToTest.filter(f => /_spec\.rb$/.test(f));
 
-program.parse(process.argv);
+            if (localConfig.test?.rb && rbTestFiles.length > 0) {
+                runTests(localConfig.test.rb, rbTestFiles);
+            }
+        });
+
+    program.parse(process.argv.slice(2));
+}
