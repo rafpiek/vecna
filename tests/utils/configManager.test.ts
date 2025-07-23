@@ -6,7 +6,7 @@ jest.mock('os');
 const mockedOs = jest.mocked(os);
 
 describe('configManager', () => {
-    let configManager;
+    let configManager: typeof import('../../src/utils/configManager');
     const FAKE_HOME_DIR = path.join(__dirname, 'test-home');
     const TEST_CONFIG_DIR = path.join(FAKE_HOME_DIR, '.config', 'vecna');
     const TEST_CONFIG_PATH = path.join(TEST_CONFIG_DIR, 'config.json');
