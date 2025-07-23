@@ -30,8 +30,8 @@ describe('test command', () => {
             uncommitted: ['file3_spec.rb']
         });
 
-        process.argv = ['node', 'vecna', 'test', 'all'];
-        await testCommand(mockConfigManager, mockGitUtils);
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
+        await testCommand(mockConfigManager, mockGitUtils, argv);
 
         expect(spawnSpy).toHaveBeenCalledWith('rspec', ['file1_spec.rb', 'file3_spec.rb'], expect.any(Object));
     });
@@ -48,8 +48,8 @@ describe('test command', () => {
             uncommitted: ['file2_spec.rb']
         });
 
-        process.argv = ['node', 'vecna', 'test', 'all', '-c'];
-        await testCommand(mockConfigManager, mockGitUtils);
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all', '-c'];
+        await testCommand(mockConfigManager, mockGitUtils, argv);
 
         expect(spawnSpy).toHaveBeenCalledWith('rspec', ['file1_spec.rb'], expect.any(Object));
         expect(spawnSpy).not.toHaveBeenCalledWith('rspec', ['file2_spec.rb'], expect.any(Object));

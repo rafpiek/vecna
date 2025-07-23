@@ -18,7 +18,7 @@ const runTests = (runner: string, files: string[]) => {
     });
 };
 
-export default (config: ConfigManager, git: GitUtils) => {
+export default (config: ConfigManager, git: GitUtils, argv: string[]) => {
     const program = new Command();
 
     program
@@ -50,5 +50,5 @@ export default (config: ConfigManager, git: GitUtils) => {
             }
         });
 
-    program.parse(process.argv.slice(2));
+    program.parse(argv);
 }

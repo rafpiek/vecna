@@ -30,8 +30,8 @@ describe('lint command', () => {
             uncommitted: ['file3.ts']
         });
 
-        process.argv = ['node', 'vecna', 'lint', 'all'];
-        await lintCommand(mockConfigManager, mockGitUtils);
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
+        await lintCommand(mockConfigManager, mockGitUtils, argv);
 
         expect(spawnSpy).toHaveBeenCalledWith('eslint', ['file1.js', 'file3.ts'], expect.any(Object));
         expect(spawnSpy).toHaveBeenCalledWith('rubocop', ['file2.rb'], expect.any(Object));
@@ -49,8 +49,8 @@ describe('lint command', () => {
             uncommitted: ['file2.ts']
         });
 
-        process.argv = ['node', 'vecna', 'lint', 'all', '-e'];
-        await lintCommand(mockConfigManager, mockGitUtils);
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all', '-e'];
+        await lintCommand(mockConfigManager, mockGitUtils, argv);
 
         expect(spawnSpy).toHaveBeenCalledWith('eslint', ['file2.ts'], expect.any(Object));
         expect(spawnSpy).not.toHaveBeenCalledWith('eslint', ['file1.js'], expect.any(Object));
