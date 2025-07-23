@@ -12,6 +12,7 @@ program.command('setup', 'setup a new project');
 program.command('list', 'list all projects');
 program.command('lint', 'lint files');
 program.command('test', 'run tests');
+program.command('version', 'show version');
 
 
 program.parse(process.argv);
