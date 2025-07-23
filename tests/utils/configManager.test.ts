@@ -13,14 +13,14 @@ describe('configManager', () => {
 
     describe('ensureGlobalConfig', () => {
         it('should create global config file if it does not exist', async () => {
-            jest.spyOn(mockFs, 'pathExists').mockResolvedValue(false);
+            (mockFs.pathExists as jest.Mock).mockResolvedValue(false);
             await manager.ensureGlobalConfig();
             expect(mockFs.ensureDir).toHaveBeenCalled();
             expect(mockFs.writeJson).toHaveBeenCalledWith(expect.any(String), { projects: [] }, { spaces: 2 });
         });
 
         it('should not create global config if it exists', async () => {
-            jest.spyOn(mockFs, 'pathExists').mockResolvedValue(true);
+            (mockFs.pathExists as jest.Mock).mockResolvedValue(true);
             await manager.ensureGlobalConfig();
             expect(mockFs.writeJson).not.toHaveBeenCalled();
         });
@@ -29,7 +29,7 @@ describe('configManager', () => {
     describe('readGlobalConfig', () => {
         it('should read and return the global config', async () => {
             const testConfig: GlobalConfig = { projects: [{ name: 'test-project', path: '/tmp' }] };
-            jest.spyOn(mockFs, 'pathExists').mockResolvedValue(true);
+            (mockFs.pathExists as jest.Mock).mockResolvedValue(true);
             mockFs.readJson.mockResolvedValue(testConfig);
 
             const config = await manager.readGlobalConfig();
@@ -44,7 +44,7 @@ describe('configManager', () => {
             const initialConfig: GlobalConfig = { projects: [] };
             const newProject = { name: 'new-project', path: '/tmp/new' };
 
-            jest.spyOn(mockFs, 'pathExists').mockResolvedValue(true);
+            (mockFs.pathExists as jest.Mock).mockResolvedValue(true);
             mockFs.readJson.mockResolvedValue(initialConfig);
 
             await manager.updateGlobalConfig(newProject);
