@@ -1,5 +1,9 @@
 # Design doc to create a CLI tool to work effectively with git worktrees and branches
 
+## General overview
+Vecna is fancy, colorful, interactive CLI tool to work effectively with Ruby on Rails, Stimulus projects and git worktrees and branches.
+
+
 ## Features
 
 <config-file>
@@ -50,7 +54,7 @@ Shows all projects registered in {{config-file}}, their paths and engines
 5) lint
 - by default it runs linting on files modified in the current branch versus the main branch, no matter if they are committed or not
 - it should accept parameters:
-  - all - runs linting for backend and frontend
+  - all - runs linting for backend and frontend, it's default command, and it runs also with `vecna lint`
   - rb - runs linting for backend
   - js - runs linting for frontend
   - -f - runs linting with autofix, so if rb it runs rubocop with autofix, if js it runs eslint with autofix, if all it runs both
