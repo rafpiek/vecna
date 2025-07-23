@@ -1,66 +1,69 @@
 import fs from 'fs-extra';
-import os from 'os';
-import path from 'path';
+import { ensureGlobalConfig, readGlobalConfig, updateGlobalConfig, createLocalConfig, readLocalConfig } from '../../src/utils/configManager';
 
-jest.mock('os');
-const mockedOs = jest.mocked(os);
+jest.mock('fs-extra');
+const mockedFs = jest.mocked(fs);
 
 describe('configManager', () => {
-    let configManager: typeof import('../../src/utils/configManager');
-    const FAKE_HOME_DIR = path.join(__dirname, 'test-home');
-    const TEST_CONFIG_DIR = path.join(FAKE_HOME_DIR, '.config', 'vecna');
-    const TEST_CONFIG_PATH = path.join(TEST_CONFIG_DIR, 'config.json');
 
-    beforeEach(async () => {
-        mockedOs.homedir.mockReturnValue(FAKE_HOME_DIR);
-        jest.resetModules();
-        configManager = require('../../src/utils/configManager');
-        await fs.emptyDir(TEST_CONFIG_DIR);
+    beforeEach(() => {
+        jest.clearAllMocks();
     });
 
-    afterEach(async () => {
-        await fs.remove(FAKE_HOME_DIR);
+    it('should ensure global config file exists, creating it if not present', async () => {
+        mockedFs.pathExists.mockResolvedValue(false);
+        await ensureGlobalConfig();
+        expect(mockedFs.ensureDir).toHaveBeenCalled();
+        expect(mockedFs.writeJson).toHaveBeenCalledWith(expect.any(String), { projects: [] }, { spaces: 2 });
     });
 
-    it('should ensure global config file exists', async () => {
-        await configManager.ensureGlobalConfig();
-        const configExists = await fs.pathExists(TEST_CONFIG_PATH);
-        expect(configExists).toBe(true);
-        const config = await fs.readJson(TEST_CONFIG_PATH);
-        expect(config).toEqual({ projects: [] });
+    it('should not create global config if it exists', async () => {
+        mockedFs.pathExists.mockResolvedValue(true);
+        await ensureGlobalConfig();
+        expect(mockedFs.writeJson).not.toHaveBeenCalled();
     });
 
     it('should read global config', async () => {
         const testConfig = { projects: [{ name: 'test-project', path: '/tmp' }] };
-        await fs.ensureDir(TEST_CONFIG_DIR);
-        await fs.writeJson(TEST_CONFIG_PATH, testConfig, { spaces: 2 });
-
-        const config = await configManager.readGlobalConfig();
+        mockedFs.readJson.mockResolvedValue(testConfig);
+        const config = await readGlobalConfig();
         expect(config).toEqual(testConfig);
     });
 
-    it('should update global config with a new project', async () => {
+    it('should update global config', async () => {
+        const initialConfig = { projects: [] };
         const newProject = { name: 'new-project', path: '/tmp/new' };
-        await configManager.updateGlobalConfig(newProject);
+        mockedFs.readJson.mockResolvedValue(initialConfig);
 
-        const config = await configManager.readGlobalConfig();
-        expect(config.projects).toHaveLength(1);
-        expect(config.projects[0]).toEqual(newProject);
+        await updateGlobalConfig(newProject);
+
+        expect(mockedFs.writeJson).toHaveBeenCalledWith(
+            expect.any(String),
+            { projects: [newProject] },
+            { spaces: 2 }
+        );
     });
 
-    it('should create and read local config', async () => {
-        const localConfig = { name: 'local-project', linter: { js: 'eslint' } };
-        const localConfigPath = path.join(process.cwd(), '.vecna.json');
+    it('should create local config', async () => {
+        const localConfig = { name: 'local-project' };
+        await createLocalConfig(localConfig);
+        expect(mockedFs.writeJson).toHaveBeenCalledWith(
+            expect.stringContaining('.vecna.json'),
+            expect.objectContaining({ name: 'local-project' }),
+            { spaces: 2 }
+        );
+    });
 
-        await configManager.createLocalConfig(localConfig);
+    it('should read local config', async () => {
+        const testConfig = { name: 'local-project' };
+        mockedFs.readJson.mockResolvedValue(testConfig);
+        const config = await readLocalConfig();
+        expect(config).toEqual(testConfig);
+    });
 
-        const readConfig = await configManager.readLocalConfig();
-        expect(readConfig).not.toBeNull();
-        if (readConfig) {
-            expect(readConfig.name).toBe('local-project');
-            expect(readConfig.linter?.js).toBe('eslint');
-        }
-
-        await fs.remove(localConfigPath);
+    it('should return null when local config is not found', async () => {
+        mockedFs.readJson.mockRejectedValue(new Error('File not found'));
+        const config = await readLocalConfig();
+        expect(config).toBeNull();
     });
 });

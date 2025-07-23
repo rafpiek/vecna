@@ -1,7 +1,10 @@
 import { getModifiedFiles } from '../../src/utils/git';
 import simpleGit from 'simple-git';
 
-jest.mock('simple-git');
+jest.mock('simple-git', () => ({
+    __esModule: true,
+    default: jest.fn(),
+}));
 
 const mockedSimpleGit = simpleGit as jest.Mock;
 
@@ -10,6 +13,11 @@ describe('git utils', () => {
     const mockStatus = jest.fn();
 
     beforeEach(() => {
+        mockedSimpleGit.mockReturnValue({
+            diff: mockDiff,
+            status: mockStatus,
+        });
+
         mockDiff.mockResolvedValue('file1.js\nfile2.ts');
         mockStatus.mockResolvedValue({
             files: [
@@ -17,11 +25,6 @@ describe('git utils', () => {
                 { path: 'file4.rb', index: 'A', working_dir: ' ' },
             ]
         });
-
-        mockedSimpleGit.mockReturnValue({
-            diff: mockDiff,
-            status: mockStatus,
-        } as any);
     });
 
     afterEach(() => {
