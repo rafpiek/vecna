@@ -1,9 +1,9 @@
 import { getModifiedFiles } from '../../src/utils/git';
-import simpleGit from 'simple-git';
+import simpleGit, { SimpleGit } from 'simple-git';
 
 jest.mock('simple-git');
 
-const mockedSimpleGit = simpleGit as jest.Mocked<typeof simpleGit>;
+const mockedSimpleGit = simpleGit as jest.Mock<any, any>;
 
 describe('git utils', () => {
     const mockDiff = jest.fn();
@@ -18,7 +18,7 @@ describe('git utils', () => {
             ]
         });
 
-        mockedSimpleGit.mockReturnValue({
+        (mockedSimpleGit as jest.Mock).mockReturnValue({
             diff: mockDiff,
             status: mockStatus,
         } as any);

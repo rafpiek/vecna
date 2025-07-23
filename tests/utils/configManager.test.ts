@@ -61,8 +61,10 @@ describe('configManager', () => {
 
         const readConfig = await configManager.readLocalConfig();
         expect(readConfig).not.toBeNull();
-        expect(readConfig.name).toBe('local-project');
-        expect(readConfig.linter.js).toBe('eslint');
+        if (readConfig) {
+            expect(readConfig.name).toBe('local-project');
+            expect(readConfig.linter?.js).toBe('eslint');
+        }
 
         await fs.remove(localConfigPath);
     });
