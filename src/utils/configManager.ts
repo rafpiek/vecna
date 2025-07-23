@@ -2,9 +2,9 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs-extra';
 
-export const GLOBAL_CONFIG_DIR = path.join(os.homedir(), '.config', 'vecna');
-export const GLOBAL_CONFIG_PATH = path.join(GLOBAL_CONFIG_DIR, 'config.json');
-export const LOCAL_CONFIG_FILENAME = '.vecna.json';
+const GLOBAL_CONFIG_DIR = path.join(os.homedir(), '.config', 'vecna');
+const GLOBAL_CONFIG_PATH = path.join(GLOBAL_CONFIG_DIR, 'config.json');
+const LOCAL_CONFIG_FILENAME = '.vecna.json';
 
 interface ProjectConfig {
     name: string;
