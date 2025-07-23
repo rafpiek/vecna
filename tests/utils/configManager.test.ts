@@ -12,19 +12,13 @@ describe('configManager', () => {
     const TEST_CONFIG_PATH = path.join(TEST_CONFIG_DIR, 'config.json');
 
     beforeEach(async () => {
-        // Mock homedir to point to our test-specific directory
         mockedOs.homedir.mockReturnValue(FAKE_HOME_DIR);
-
-        // Reset modules to force configManager to be re-evaluated with the mocked os
         jest.resetModules();
         configManager = require('../../src/utils/configManager');
-
-        // Ensure the test directory is clean
         await fs.emptyDir(TEST_CONFIG_DIR);
     });
 
-    afterAll(async () => {
-        // Clean up the entire test home directory
+    afterEach(async () => {
         await fs.remove(FAKE_HOME_DIR);
     });
 
@@ -38,6 +32,7 @@ describe('configManager', () => {
 
     it('should read global config', async () => {
         const testConfig = { projects: [{ name: 'test-project', path: '/tmp' }] };
+        await fs.ensureDir(TEST_CONFIG_DIR);
         await fs.writeJson(TEST_CONFIG_PATH, testConfig, { spaces: 2 });
 
         const config = await configManager.readGlobalConfig();
