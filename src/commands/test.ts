@@ -50,5 +50,5 @@ export default (config: ConfigManager, git: GitUtils, argv: string[]) => {
             }
         });
 
-    program.parse(argv);
+    return program.parseAsync(argv);
 }

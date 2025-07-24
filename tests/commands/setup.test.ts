@@ -4,8 +4,17 @@ import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 import { configManager } from '../../src/utils/configManager';
 import setupCommand from '../../src/commands/setup';
 
-jest.mock('inquirer');
-jest.mock('fs-extra');
+jest.mock('inquirer', () => ({
+    prompt: jest.fn(),
+}));
+jest.mock('fs-extra', () => ({
+    pathExists: jest.fn(),
+    readFile: jest.fn(),
+    readJson: jest.fn(),
+}));
+
+const mockedInquirer = inquirer as jest.Mocked<typeof inquirer>;
+const mockedFs = fs as jest.Mocked<typeof fs>;
 
 describe('setup command', () => {
     let mockConfigManager: DeepMockProxy<ReturnType<typeof configManager>>;
@@ -16,12 +25,12 @@ describe('setup command', () => {
     });
 
     it('should prompt for project name and create config files', async () => {
-        (inquirer.prompt as jest.Mock).mockResolvedValue({ projectName: 'test-project' });
-        (fs.pathExists as jest.Mock).mockResolvedValue(false);
+        mockedInquirer.prompt.mockResolvedValue({ projectName: 'test-project' });
+        mockedFs.pathExists.mockResolvedValue(false);
 
         await setupCommand(mockConfigManager);
 
-        expect(inquirer.prompt).toHaveBeenCalled();
+        expect(mockedInquirer.prompt).toHaveBeenCalled();
         expect(mockConfigManager.createLocalConfig).toHaveBeenCalledWith({
             name: 'test-project',
             linter: {},
@@ -33,17 +42,17 @@ describe('setup command', () => {
     });
 
     it('should detect rspec and eslint', async () => {
-        (inquirer.prompt as jest.Mock).mockResolvedValue({ projectName: 'test-project' });
+        mockedInquirer.prompt.mockResolvedValue({ projectName: 'test-project' });
 
-        (fs.pathExists as jest.Mock).mockImplementation(path => {
+        mockedFs.pathExists.mockImplementation(path => {
             if (typeof path === 'string') {
                 return Promise.resolve(path.endsWith('Gemfile') || path.endsWith('package.json'));
             }
             return Promise.resolve(false);
         });
 
-        (fs.readFile as jest.Mock).mockResolvedValue('gem "rspec"');
-        (fs.readJson as jest.Mock).mockResolvedValue({ scripts: { lint: 'eslint' } });
+        mockedFs.readFile.mockResolvedValue('gem "rspec"');
+        mockedFs.readJson.mockResolvedValue({ scripts: { lint: 'eslint' } });
 
         await setupCommand(mockConfigManager);
 
