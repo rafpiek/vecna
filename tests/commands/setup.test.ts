@@ -7,9 +7,6 @@ import setupCommand from '../../src/commands/setup';
 jest.mock('inquirer');
 jest.mock('fs-extra');
 
-const mockedInquirer = inquirer as jest.Mocked<typeof inquirer>;
-const mockedFs = fs as jest.Mocked<typeof fs>;
-
 describe('setup command', () => {
     let mockConfigManager: DeepMockProxy<ReturnType<typeof configManager>>;
 
@@ -19,12 +16,12 @@ describe('setup command', () => {
     });
 
     it('should prompt for project name and create config files', async () => {
-        mockedInquirer.prompt = jest.fn().mockResolvedValue({ projectName: 'test-project' });
-        (mockedFs.pathExists as jest.Mock).mockResolvedValue(false);
+        const promptSpy = jest.spyOn(inquirer, 'prompt').mockResolvedValue({ projectName: 'test-project' } as any);
+        const pathExistsSpy = jest.spyOn(fs, 'pathExists').mockResolvedValue(false as any);
 
         await setupCommand(mockConfigManager);
 
-        expect(mockedInquirer.prompt).toHaveBeenCalled();
+        expect(promptSpy).toHaveBeenCalled();
         expect(mockConfigManager.createLocalConfig).toHaveBeenCalledWith({
             name: 'test-project',
             linter: {},
@@ -36,17 +33,15 @@ describe('setup command', () => {
     });
 
     it('should detect rspec and eslint', async () => {
-        mockedInquirer.prompt = jest.fn().mockResolvedValue({ projectName: 'test-project' });
-
-        (mockedFs.pathExists as jest.Mock).mockImplementation(path => {
+        const promptSpy = jest.spyOn(inquirer, 'prompt').mockResolvedValue({ projectName: 'test-project' } as any);
+        const pathExistsSpy = jest.spyOn(fs, 'pathExists').mockImplementation(path => {
             if (typeof path === 'string') {
                 return Promise.resolve(path.endsWith('Gemfile') || path.endsWith('package.json'));
             }
             return Promise.resolve(false);
         });
-
-        mockedFs.readFile = jest.fn().mockResolvedValue('gem "rspec"');
-        mockedFs.readJson = jest.fn().mockResolvedValue({ scripts: { lint: 'eslint' } });
+        const readFileSpy = jest.spyOn(fs, 'readFile').mockResolvedValue('gem "rspec"' as any);
+        const readJsonSpy = jest.spyOn(fs, 'readJson').mockResolvedValue({ scripts: { lint: 'eslint' } });
 
         await setupCommand(mockConfigManager);
 
