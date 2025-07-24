@@ -38,6 +38,11 @@ program
     .action((options) => import('./commands/switch').then(i => i.default(gitInstance, options)));
 
 program
+    .command('shell-install')
+    .description('Install shell integration for better worktree switching')
+    .action(() => import('./commands/shell-install').then(i => i.default()));
+
+program
     .command('list')
     .description('list all projects')
     .action(() => import('./commands/list').then(i => i.default(config)));

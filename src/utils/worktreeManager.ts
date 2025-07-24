@@ -52,7 +52,8 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
 
     const create = async (branchName: string): Promise<void> => {
         const worktreeDir = path.join(homedir(), 'dev', 'trees');
-        const worktreePath = path.join(worktreeDir, branchName.replace(/\//g, '-'));
+        const worktreeName = branchName.replace(/\//g, '-');
+        const worktreePath = path.join(worktreeDir, worktreeName);
 
         // Ensure the worktree directory exists
         await fs.ensureDir(worktreeDir);
@@ -62,6 +63,25 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         }
 
         await gitRepo.addWorktree(worktreePath, branchName);
+
+        // Save worktree state
+        await saveWorktreeState({
+            name: worktreeName,
+            branch: branchName,
+            path: worktreePath,
+            isActive: true,
+            isCurrent: false,
+            lastCommit: {
+                hash: '',
+                message: '',
+                date: new Date()
+            },
+            status: {
+                hasUncommittedChanges: false,
+                ahead: 0,
+                behind: 0
+            }
+        });
     };
 
     const createWorktree = async (branchName: string, options: CreateOptions = {}): Promise<WorktreeInfo> => {
@@ -159,6 +179,9 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
     const runPostCreateScripts = async (targetPath: string): Promise<void> => {
         const localConfig = await config.readLocalConfig();
 
+        // Handle Procfile.dev port modification (from original WT script)
+        await handleProcfilePortModification(targetPath);
+
         // Detect package manager
         let packageManager = 'npm';
         if (await fs.pathExists(path.join(targetPath, 'yarn.lock'))) {
@@ -191,10 +214,77 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         }
     };
 
+    const handleProcfilePortModification = async (targetPath: string): Promise<void> => {
+        const procfilePath = path.join(targetPath, 'Procfile.dev');
+
+        if (await fs.pathExists(procfilePath)) {
+            try {
+                const procfileContent = await fs.readFile(procfilePath, 'utf-8');
+
+                // Check if -p 3000 exists in the file
+                if (procfileContent.includes('-p 3000')) {
+                    // Find an available port between 3001 and 4000
+                    let newPort = null;
+
+                    for (let port = 3001; port <= 4000; port++) {
+                        if (await isPortAvailable(port)) {
+                            newPort = port;
+                            break;
+                        }
+                    }
+
+                    if (newPort) {
+                        const updatedContent = procfileContent.replace(/-p 3000/g, `-p ${newPort}`);
+                        await fs.writeFile(procfilePath, updatedContent);
+                        console.log(`  Updated Procfile.dev port from 3000 to ${newPort}`);
+                    } else {
+                        console.log('  Procfile.dev found but couldn\'t find available port between 3001-4000');
+                    }
+                }
+            } catch (error) {
+                console.log('  Warning: Could not modify Procfile.dev port');
+            }
+        }
+    };
+
+    const isPortAvailable = async (port: number): Promise<boolean> => {
+        try {
+            // Use lsof to check if port is in use (Unix/macOS)
+            await execa('lsof', ['-i', `:${port}`], { stdio: 'ignore' });
+            return false; // Port is in use
+        } catch {
+            return true; // Port is available (lsof returned non-zero exit code)
+        }
+    };
+
+    const saveWorktreeState = async (info: WorktreeInfo): Promise<void> => {
+        await config.updateWorktreeState(info.name, {
+            branch: info.branch,
+            path: info.path,
+            createdAt: new Date().toISOString(),
+            lastAccessedAt: new Date().toISOString()
+        });
+    };
+
+    const getWorktreeState = async (name: string): Promise<any> => {
+        return await config.getWorktreeState(name);
+    };
+
+    const cleanOrphanedStates = async (): Promise<void> => {
+        const allStates = await config.getAllWorktreeStates();
+        const gitWorktrees = await gitRepo.listWorktrees();
+        const validPaths = new Set(gitWorktrees.map(wt => wt.path));
+
+        for (const [name, state] of Object.entries(allStates)) {
+            if (!validPaths.has((state as any).path)) {
+                await config.removeWorktreeState(name);
+                console.log(`Cleaned orphaned state for: ${name}`);
+            }
+        }
+    };
+
     const cleanWorktreeState = async (name: string): Promise<void> => {
-        // Placeholder for cleaning up worktree state from vecna.json
-        // This would remove the worktree entry from the configuration
-        console.log(`Cleaning up state for worktree: ${name}`);
+        await config.removeWorktreeState(name);
     };
 
     return {
@@ -203,6 +293,9 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         listWorktrees,
         copyConfigFiles,
         runPostCreateScripts,
+        saveWorktreeState,
+        getWorktreeState,
+        cleanOrphanedStates,
         cleanWorktreeState,
         // ... other functions will be implemented later
     } as WorktreeManager;

@@ -7,55 +7,77 @@ import { configManager, ProjectConfig } from '../utils/configManager';
 
 type ConfigManager = ReturnType<typeof configManager>;
 
-export default (config: ConfigManager) => {
-    const { createLocalConfig, updateGlobalConfig } = config;
+export default async (config: ConfigManager) => {
+    try {
+        const answers = await inquirer.prompt([
+            {
+                type: 'input',
+                name: 'projectName',
+                message: 'Enter the project name:',
+                default: path.basename(process.cwd()),
+            },
+            {
+                type: 'input',
+                name: 'mainBranch',
+                message: 'Enter the main branch name:',
+                default: 'main',
+            },
+            {
+                type: 'input',
+                name: 'jsLinter',
+                message: 'Enter the JavaScript/TypeScript linter command (optional):',
+                default: 'eslint',
+            },
+            {
+                type: 'input',
+                name: 'rbLinter',
+                message: 'Enter the Ruby linter command (optional):',
+                default: 'rubocop',
+            },
+            {
+                type: 'input',
+                name: 'rbTestRunner',
+                message: 'Enter the Ruby test runner command (optional):',
+                default: 'rspec',
+            },
+        ]);
 
-    return new Promise<void>(async (resolve, reject) => {
-        try {
-            const answers = await inquirer.prompt([
-                {
-                    type: 'input',
-                    name: 'projectName',
-                    message: 'Enter the project name:',
-                    default: path.basename(process.cwd()),
-                },
-            ]);
-
-            const { projectName } = answers;
-
-            const projectConfig: Omit<ProjectConfig, 'path'> = {
-                name: projectName,
-                linter: {},
-                test: {}
-            };
-
-            // Detect rspec
-            const gemfilePath = path.join(process.cwd(), 'Gemfile');
-            if (await fs.pathExists(gemfilePath)) {
-                const gemfileContent = await fs.readFile(gemfilePath, 'utf-8');
-                if (gemfileContent.includes('rspec')) {
-                    if (!projectConfig.test) projectConfig.test = {};
-                    projectConfig.test.rb = 'rspec';
+        const projectConfig: ProjectConfig = {
+            name: answers.projectName,
+            path: process.cwd(),
+            mainBranch: answers.mainBranch,
+            linter: {
+                js: answers.jsLinter || undefined,
+                rb: answers.rbLinter || undefined,
+            },
+            test: {
+                rb: answers.rbTestRunner || undefined,
+            },
+            worktrees: {
+                baseDir: path.join(require('os').homedir(), 'dev', 'trees'),
+                copyFiles: ['config/master.key', 'config/application.yml'],
+                defaultBranch: answers.mainBranch,
+                autoInstall: true,
+                packageManager: 'auto',
+                postCreateScripts: [],
+                editor: {
+                    command: 'code',
+                    openOnSwitch: false
                 }
-            }
+            },
+            worktreeState: {}
+        };
 
-            // Detect eslint
-            const packageJsonPath = path.join(process.cwd(), 'package.json');
-            if (await fs.pathExists(packageJsonPath)) {
-                const packageJson = await fs.readJson(packageJsonPath);
-                if (packageJson.scripts?.lint?.includes('eslint')) {
-                    if (!projectConfig.linter) projectConfig.linter = {};
-                    projectConfig.linter.js = 'eslint';
-                }
-            }
+        // Write local config
+        await config.writeLocalConfig(projectConfig);
 
-            await createLocalConfig(projectConfig);
-            await updateGlobalConfig({ ...projectConfig, path: process.cwd() });
+        // Update global config
+        await config.updateGlobalConfig(projectConfig);
 
-            console.log(`Project ${projectName} setup complete.`);
-            resolve();
-        } catch (error) {
-            reject(error);
-        }
-    });
+        console.log(`Project ${answers.projectName} setup complete.`);
+
+    } catch (error) {
+        console.error('Setup failed:', error);
+        throw error;
+    }
 };
