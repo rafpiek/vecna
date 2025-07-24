@@ -9,14 +9,27 @@ const LOCAL_CONFIG_FILENAME = '.vecna.json';
 export interface ProjectConfig {
     name: string;
     path: string;
-    mainBranch?: string;
     linter?: {
         js?: string;
         rb?: string;
     };
     test?: {
         rb?: string;
-    }
+    };
+    mainBranch?: string;
+    worktrees?: {
+        baseDir?: string;
+        copyFiles?: string[];
+        copyPatterns?: string[];
+        defaultBranch?: string;
+        autoInstall?: boolean;
+        packageManager?: 'yarn' | 'npm' | 'pnpm' | 'auto';
+        postCreateScripts?: string[];
+        editor?: {
+            command?: string;
+            openOnSwitch?: boolean;
+        };
+    };
 }
 
 export interface GlobalConfig {

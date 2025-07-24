@@ -1,50 +1,126 @@
-import { Command } from 'commander';
-import { worktreeManager } from '../utils/worktreeManager';
-import inquirer from 'inquirer';
-import clipboardy from 'clipboardy';
 import { Listr } from 'listr2';
+import clipboard from 'clipboardy';
+import { gitUtils } from '../utils/git';
+import { worktreeManager } from '../utils/worktreeManager';
+import { SimpleGit } from 'simple-git';
+import chalk from 'chalk';
+import path from 'path';
+import { homedir } from 'os';
 
-export const startCommand = new Command('start')
-    .description('Create a new worktree')
-    .option('-b, --branch <name>', 'Specify branch name directly')
-    .option('--no-install', 'Skip dependency installation')
-    .action(async (options) => {
-        let branchName = options.branch;
+interface StartOptions {
+    branch?: string;
+    install?: boolean;
+    from?: string;
+}
 
-        if (!branchName) {
-            const clipboardContent = await clipboardy.read();
-            const { branch } = await inquirer.prompt([
-                {
-                    type: 'input',
-                    name: 'branch',
-                    message: 'Enter the branch name:',
-                    default: clipboardContent,
-                },
-            ]);
-            branchName = branch;
-        }
+export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
+    const git = gitUtils(gitInstance);
+    const manager = worktreeManager(gitInstance);
 
-        if (!branchName) {
-            console.error('Branch name is required.');
-            return;
-        }
+    // Get branch name from options or prompt
+    const branchName = options.branch || await getBranchName();
+    const fromBranch = options.from || 'main';
+    const shouldInstall = options.install !== false;
 
-        const tasks = new Listr([
-            {
-                title: 'Creating worktree',
-                task: async (ctx, task) => {
-                    const manager = worktreeManager();
-                    const worktree = await manager.createWorktree(branchName, {
-                        noInstall: options.noInstall,
-                    });
-                    task.title = `Worktree created at ${worktree.path}`;
-                },
+    // Generate worktree path
+    const worktreeDir = path.join(homedir(), 'dev', 'trees');
+    const worktreeName = branchName.replace(/\//g, '-');
+    const worktreePath = path.join(worktreeDir, worktreeName);
+
+    const tasks = new Listr([
+        {
+            title: 'Validating branch name',
+            task: async (ctx) => {
+                if (!branchName) {
+                    throw new Error('Branch name is required');
+                }
+                ctx.branchName = branchName;
+                ctx.worktreePath = worktreePath;
             },
-        ]);
+        },
+        {
+            title: `Checking out to ${fromBranch} branch`,
+            task: async () => {
+                const currentBranch = await git.getCurrentBranch();
+                if (currentBranch !== fromBranch) {
+                    await git.checkout(fromBranch);
+                }
+            },
+        },
+        {
+            title: 'Pulling latest changes',
+            task: async () => {
+                await git.pull();
+            },
+        },
+        {
+            title: 'Creating branch if needed',
+            task: async () => {
+                const branchExists = await git.branchExists(branchName);
+                if (!branchExists) {
+                    await git.createBranch(branchName, fromBranch);
+                }
+            },
+        },
+        {
+            title: 'Creating worktree',
+            task: async (ctx) => {
+                await manager.create(branchName);
+                ctx.worktreeCreated = true;
+            },
+        },
+        {
+            title: 'Copying configuration files',
+            task: async (ctx) => {
+                await manager.copyConfigFiles(ctx.worktreePath);
+            },
+        },
+        {
+            title: 'Installing dependencies',
+            skip: () => !shouldInstall,
+            task: async (ctx) => {
+                await manager.runPostCreateScripts(ctx.worktreePath);
+            },
+        },
+    ]);
 
-        try {
-            await tasks.run();
-        } catch (e) {
-            console.error(e);
-        }
-    });
+    try {
+        const ctx = await tasks.run();
+
+        console.log('\n' + chalk.green('✓') + ' Worktree created successfully!');
+        console.log('\nLocation: ' + chalk.cyan(ctx.worktreePath));
+        console.log('\nTo navigate to your worktree:');
+        console.log(chalk.yellow(`  cd ${ctx.worktreePath}`));
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('\n' + chalk.red('✗') + ' Failed to create worktree:', errorMessage);
+        process.exit(1);
+    }
+};
+
+async function getBranchName(): Promise<string> {
+    const clipboardContent = await clipboard.read().catch(() => '');
+
+    const tasks = new Listr([
+        {
+            title: 'Enter branch name',
+            task: async (ctx, task) => {
+                const branchName = await task.prompt({
+                    type: 'input',
+                    message: 'Enter branch name:',
+                    initial: clipboardContent,
+                });
+
+                if (!branchName) {
+                    throw new Error('Branch name is required');
+                }
+
+                ctx.branchName = branchName;
+            },
+        },
+    ]);
+
+    const { branchName } = await tasks.run();
+    return branchName;
+}

@@ -6,13 +6,13 @@ import simpleGit from 'simple-git';
 import { configManager } from './utils/configManager';
 import { gitUtils } from './utils/git';
 import { worktreeCommand } from './commands/worktree';
-import { startCommand } from './commands/start';
 
 const program = new Command();
 
 // Create instances of utils with dependencies
 const config = configManager(fs);
-const git = gitUtils(simpleGit());
+const gitInstance = simpleGit();
+const git = gitUtils(gitInstance);
 
 program
     .version('1.0.0')
@@ -23,7 +23,19 @@ program
     .description('setup a new project')
     .action(() => import('./commands/setup').then(i => i.default(config)));
 
-program.addCommand(startCommand);
+program
+    .command('start')
+    .description('Create a new worktree')
+    .option('-b, --branch <name>', 'Specify branch name directly')
+    .option('--no-install', 'Skip dependency installation')
+    .option('--from <branch>', 'Create worktree from specific branch (default: main)')
+    .action((options) => import('./commands/start').then(i => i.default(gitInstance, options)));
+
+program
+    .command('switch')
+    .description('Switch between worktrees interactively')
+    .option('--json', 'Output result in JSON format')
+    .action((options) => import('./commands/switch').then(i => i.default(gitInstance, options)));
 
 program
     .command('list')

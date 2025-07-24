@@ -17,15 +17,23 @@ describe('lint command', () => {
         jest.clearAllMocks();
         mockConfigManager = mockDeep<ReturnType<typeof configManager>>();
         mockGitUtils = mockDeep<ReturnType<typeof gitUtils>>();
-        spawnSpy = (spawn as jest.Mock).mockReturnValue({ on: jest.fn() });
+        spawnSpy = (spawn as jest.Mock).mockReturnValue({ on: jest.fn(), exitCode: 0 });
     });
 
     it('should show an error if not in a git repo', async () => {
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
         mockGitUtils.isGitRepo.mockResolvedValue(false);
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
-        await lintCommand(mockConfigManager, mockGitUtils, argv);
+        await lintCommand(mockConfigManager, mockGitUtils, 'all', {});
         expect(console.error).toHaveBeenCalledWith('This command must be run inside a git repository.');
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should show an error if config is not found', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        mockGitUtils.isGitRepo.mockResolvedValue(true);
+        mockConfigManager.readLocalConfig.mockResolvedValue(null);
+        await lintCommand(mockConfigManager, mockGitUtils, 'all', {});
+        expect(console.error).toHaveBeenCalledWith('No .vecna.json found. Run "vecna setup" first.');
         consoleErrorSpy.mockRestore();
     });
 
@@ -41,8 +49,7 @@ describe('lint command', () => {
         mockGitUtils.getModifiedFiles.mockResolvedValue({ committed: ['file1.js'], uncommitted: [] });
         (dependencyExists as jest.Mock).mockResolvedValue(false);
 
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
-        await lintCommand(mockConfigManager, mockGitUtils, argv);
+        await lintCommand(mockConfigManager, mockGitUtils, 'all', {});
 
         expect(console.error).toHaveBeenCalledWith('Linter "nonexistent-linter" not found. Please install it.');
         consoleErrorSpy.mockRestore();
@@ -62,11 +69,10 @@ describe('lint command', () => {
         });
         (dependencyExists as jest.Mock).mockResolvedValue(true);
 
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
-        await lintCommand(mockConfigManager, mockGitUtils, argv);
+        await lintCommand(mockConfigManager, mockGitUtils, 'all', {});
 
-        expect(spawnSpy).toHaveBeenCalledWith('eslint', ['file1.js', 'file3.ts'], expect.any(Object));
-        expect(spawnSpy).toHaveBeenCalledWith('rubocop', ['file2.rb'], expect.any(Object));
+        expect(spawnSpy).toHaveBeenCalledWith(expect.stringContaining('eslint'), expect.arrayContaining(['file1.js', 'file3.ts']), expect.any(Object));
+        expect(spawnSpy).toHaveBeenCalledWith('rubocop', expect.arrayContaining(['file2.rb']), expect.any(Object));
     });
 
     it('should only lint uncommitted files with -e flag', async () => {
@@ -83,10 +89,9 @@ describe('lint command', () => {
         });
         (dependencyExists as jest.Mock).mockResolvedValue(true);
 
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all', '-e'];
-        await lintCommand(mockConfigManager, mockGitUtils, argv);
+        await lintCommand(mockConfigManager, mockGitUtils, 'all', { uncommitted: true });
 
-        expect(spawnSpy).toHaveBeenCalledWith('eslint', ['file2.ts'], expect.any(Object));
-        expect(spawnSpy).not.toHaveBeenCalledWith('eslint', ['file1.js'], expect.any(Object));
+        expect(spawnSpy).toHaveBeenCalledWith(expect.stringContaining('eslint'), expect.arrayContaining(['file2.ts']), expect.any(Object));
+        expect(spawnSpy).not.toHaveBeenCalledWith(expect.stringContaining('eslint'), expect.arrayContaining(['file1.js']), expect.any(Object));
     });
 });

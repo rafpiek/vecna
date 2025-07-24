@@ -17,15 +17,23 @@ describe('test command', () => {
         jest.clearAllMocks();
         mockConfigManager = mockDeep<ReturnType<typeof configManager>>();
         mockGitUtils = mockDeep<ReturnType<typeof gitUtils>>();
-        spawnSpy = (spawn as jest.Mock).mockReturnValue({ on: jest.fn() });
+        spawnSpy = (spawn as jest.Mock).mockReturnValue({ on: jest.fn(), exitCode: 0 });
     });
 
     it('should show an error if not in a git repo', async () => {
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
         mockGitUtils.isGitRepo.mockResolvedValue(false);
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
-        await testCommand(mockConfigManager, mockGitUtils, argv);
+        await testCommand(mockConfigManager, mockGitUtils, 'all', {});
         expect(console.error).toHaveBeenCalledWith('This command must be run inside a git repository.');
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('should show an error if config is not found', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        mockGitUtils.isGitRepo.mockResolvedValue(true);
+        mockConfigManager.readLocalConfig.mockResolvedValue(null);
+        await testCommand(mockConfigManager, mockGitUtils, 'all', {});
+        expect(console.error).toHaveBeenCalledWith('No .vecna.json found. Run "vecna setup" first.');
         consoleErrorSpy.mockRestore();
     });
 
@@ -41,8 +49,7 @@ describe('test command', () => {
         mockGitUtils.getModifiedFiles.mockResolvedValue({ committed: ['file1_spec.rb'], uncommitted: [] });
         (dependencyExists as jest.Mock).mockResolvedValue(false);
 
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
-        await testCommand(mockConfigManager, mockGitUtils, argv);
+        await testCommand(mockConfigManager, mockGitUtils, 'all', {});
 
         expect(console.error).toHaveBeenCalledWith('Test runner "nonexistent-runner" not found. Please install it.');
         consoleErrorSpy.mockRestore();
@@ -62,8 +69,7 @@ describe('test command', () => {
         });
         (dependencyExists as jest.Mock).mockResolvedValue(true);
 
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
-        await testCommand(mockConfigManager, mockGitUtils, argv);
+        await testCommand(mockConfigManager, mockGitUtils, 'all', {});
 
         expect(spawnSpy).toHaveBeenCalledWith('rspec', ['file1_spec.rb', 'file3_spec.rb'], expect.any(Object));
     });
@@ -82,8 +88,7 @@ describe('test command', () => {
         });
         (dependencyExists as jest.Mock).mockResolvedValue(true);
 
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'all', '-c'];
-        await testCommand(mockConfigManager, mockGitUtils, argv);
+        await testCommand(mockConfigManager, mockGitUtils, 'all', { committed: true });
 
         expect(spawnSpy).toHaveBeenCalledWith('rspec', ['file1_spec.rb'], expect.any(Object));
         expect(spawnSpy).not.toHaveBeenCalledWith('rspec', ['file2_spec.rb'], expect.any(Object));

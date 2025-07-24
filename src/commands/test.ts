@@ -25,8 +25,14 @@ const runTests = async (runner: string, files: string[]) => {
 };
 
 export default async (config: ConfigManager, git: GitUtils, subcommand?: string, options: any = {}) => {
+    const { isGitRepo, getModifiedFiles } = git;
+
+    if (!await isGitRepo()) {
+        console.error('This command must be run inside a git repository.');
+        return;
+    }
+
     const { readLocalConfig } = config;
-    const { getModifiedFiles } = git;
 
     try {
         const localConfig = await readLocalConfig();

@@ -32,6 +32,9 @@ export const gitUtils = (git: SimpleGit) => ({
             uncommitted
         };
     },
+    checkout: async (branch: string): Promise<void> => {
+        await git.checkout(branch);
+    },
     addWorktree: async (path: string, branch: string): Promise<void> => {
         await git.raw('worktree', 'add', path, branch);
     },
@@ -102,5 +105,8 @@ export const gitUtils = (git: SimpleGit) => ({
         const revList = await git.raw('rev-list', '--left-right', '--count', `${against}...${branch}`);
         const [behind, ahead] = revList.trim().split('\t').map(Number);
         return { ahead, behind };
+    },
+    pull: async (): Promise<void> => {
+        await git.pull();
     }
 });
