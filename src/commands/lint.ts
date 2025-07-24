@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+// This is a test comment to check uncommitted changes
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs-extra';
