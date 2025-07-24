@@ -38,6 +38,7 @@ describe('test command', () => {
             test: { rb: 'nonexistent-runner' }
         };
         mockConfigManager.readLocalConfig.mockResolvedValue(localConfig);
+        mockGitUtils.getModifiedFiles.mockResolvedValue({ committed: ['file1_spec.rb'], uncommitted: [] });
         (dependencyExists as jest.Mock).mockResolvedValue(false);
 
         const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
@@ -81,7 +82,7 @@ describe('test command', () => {
         });
         (dependencyExists as jest.Mock).mockResolvedValue(true);
 
-        const argv = ['/usr/bin/node', '/path/to/vecna', 'test', 'all', '-c'];
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all', '-c'];
         await testCommand(mockConfigManager, mockGitUtils, argv);
 
         expect(spawnSpy).toHaveBeenCalledWith('rspec', ['file1_spec.rb'], expect.any(Object));

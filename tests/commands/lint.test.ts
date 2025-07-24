@@ -38,6 +38,7 @@ describe('lint command', () => {
             linter: { js: 'nonexistent-linter' }
         };
         mockConfigManager.readLocalConfig.mockResolvedValue(localConfig);
+        mockGitUtils.getModifiedFiles.mockResolvedValue({ committed: ['file1.js'], uncommitted: [] });
         (dependencyExists as jest.Mock).mockResolvedValue(false);
 
         const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
