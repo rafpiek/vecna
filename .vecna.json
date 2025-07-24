@@ -1,0 +1,8 @@
+{
+  "name": "vecna",
+  "linter": {
+    "js": "eslint"
+  },
+  "test": {},
+  "path": "/Users/rafalpiekara/dev/vecna"
+}

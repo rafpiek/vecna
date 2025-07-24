@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { Command } from 'commander';
+import path from 'path';
+import fs from 'fs-extra';
 import { configManager } from '../utils/configManager';
 import { gitUtils } from '../utils/git';
 import { dependencyExists } from '../utils/dependencyCheck';
@@ -9,56 +10,74 @@ import { dependencyExists } from '../utils/dependencyCheck';
 type ConfigManager = ReturnType<typeof configManager>;
 type GitUtils = ReturnType<typeof gitUtils>;
 
-const runTests = (runner: string, files: string[]) => {
-    const process = spawn(runner, files, { stdio: 'inherit' });
+const runTests = async (runner: string, files: string[]) => {
+    // Check if test runner exists locally first, then globally
+    const localBinPath = path.join(process.cwd(), 'node_modules', '.bin', runner);
+    const runnerPath = await fs.pathExists(localBinPath) ? localBinPath : runner;
 
-    process.on('close', (code) => {
+    const childProcess = spawn(runnerPath, files, { stdio: 'inherit' });
+
+    childProcess.on('close', (code) => {
         if (code !== 0) {
             console.error(`Test runner exited with code ${code}`);
         }
     });
 };
 
-export default (config: ConfigManager, git: GitUtils, argv: string[]) => {
-    const program = new Command();
+export default async (config: ConfigManager, git: GitUtils, subcommand?: string, options: any = {}) => {
+    const { readLocalConfig } = config;
+    const { getModifiedFiles } = git;
 
-    program
-        .command('all')
-        .option('-e, --uncommitted', 'Test uncommitted changes only')
-        .option('-c, --committed', 'Test committed changes against main branch')
-        .action(async (options) => {
-            const isGitRepo = await git.isGitRepo();
-            if (!isGitRepo) {
-                console.error('This command must be run inside a git repository.');
+    try {
+        const localConfig = await readLocalConfig();
+        if (!localConfig) {
+            console.error('No .vecna.json found. Run "vecna setup" first.');
+            return;
+        }
+
+        // Get modified files based on options
+        let filesToTest: string[] = [];
+
+        if (options.uncommitted && options.committed) {
+            // Both flags: get all modified files
+            const { committed, uncommitted } = await getModifiedFiles(localConfig.mainBranch || 'main');
+            filesToTest = [...committed, ...uncommitted];
+        } else if (options.uncommitted) {
+            // Only uncommitted
+            const { uncommitted } = await getModifiedFiles(localConfig.mainBranch || 'main');
+            filesToTest = uncommitted;
+        } else if (options.committed) {
+            // Only committed
+            const { committed } = await getModifiedFiles(localConfig.mainBranch || 'main');
+            filesToTest = committed;
+        } else {
+            // Default: all modified files
+            const { committed, uncommitted } = await getModifiedFiles(localConfig.mainBranch || 'main');
+            filesToTest = [...committed, ...uncommitted];
+        }
+
+        // Filter for test files based on subcommand
+        let rbTestFiles: string[] = [];
+
+        if (!subcommand || subcommand === 'all') {
+            rbTestFiles = filesToTest.filter(f => /_spec\.rb$/.test(f));
+        } else if (subcommand === 'rb') {
+            rbTestFiles = filesToTest.filter(f => /_spec\.rb$/.test(f));
+        }
+
+        // Run tests
+        if (localConfig.test?.rb && rbTestFiles.length > 0) {
+            if (!await dependencyExists(localConfig.test.rb)) {
+                console.error(`Test runner "${localConfig.test.rb}" not found. Please install it.`);
                 return;
             }
-            const localConfig = await config.readLocalConfig();
-            if (!localConfig) {
-                console.error('No .vecna.json found. Run "vecna setup" first.');
-                return;
-            }
+            await runTests(localConfig.test.rb, rbTestFiles);
+        }
 
-            const { committed, uncommitted } = await git.getModifiedFiles();
-            let filesToTest: string[] = [];
-
-            if (options.uncommitted) {
-                filesToTest = uncommitted;
-            } else if (options.committed) {
-                filesToTest = committed;
-            } else {
-                filesToTest = [...committed, ...uncommitted];
-            }
-
-            const rbTestFiles = filesToTest.filter(f => /_spec\.rb$/.test(f));
-
-            if (localConfig.test?.rb && rbTestFiles.length > 0) {
-                if (!await dependencyExists(localConfig.test.rb)) {
-                    console.error(`Test runner "${localConfig.test.rb}" not found. Please install it.`);
-                    return;
-                }
-                runTests(localConfig.test.rb, rbTestFiles);
-            }
-        });
-
-    return program.parseAsync(argv);
-}
+        if (rbTestFiles.length === 0) {
+            console.log('No test files to run.');
+        }
+    } catch (error) {
+        console.error('Error running tests:', error);
+    }
+};

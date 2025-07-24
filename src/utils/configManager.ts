@@ -9,6 +9,7 @@ const LOCAL_CONFIG_FILENAME = '.vecna.json';
 export interface ProjectConfig {
     name: string;
     path: string;
+    mainBranch?: string;
     linter?: {
         js?: string;
         rb?: string;
