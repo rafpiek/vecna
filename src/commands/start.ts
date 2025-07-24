@@ -1,5 +1,5 @@
 import { Listr } from 'listr2';
-import clipboard from 'clipboardy';
+// Dynamic import for clipboardy ESM module
 import { gitUtils } from '../utils/git';
 import { worktreeManager } from '../utils/worktreeManager';
 import { SimpleGit } from 'simple-git';
@@ -100,7 +100,8 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
 };
 
 async function getBranchName(): Promise<string> {
-    const clipboardContent = await clipboard.read().catch(() => '');
+    const clipboard = await import('clipboardy');
+    const clipboardContent = await clipboard.default.read().catch(() => '');
 
     const tasks = new Listr([
         {

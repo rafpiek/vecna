@@ -28,6 +28,7 @@ export interface ProjectConfig {
         editor?: {
             command?: string;
             openOnSwitch?: boolean;
+            preferCursor?: boolean;
         };
     };
     worktreeState?: {

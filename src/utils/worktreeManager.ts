@@ -4,6 +4,7 @@ import { homedir } from 'os';
 import path from 'path';
 import fs from 'fs-extra';
 import execa from 'execa';
+import { spawn } from 'child_process';
 import { configManager } from './configManager';
 
 interface WorktreeInfo {
@@ -211,6 +212,37 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
                 cwd: targetPath,
                 stdio: 'inherit'
             });
+        }
+
+        // Auto-open in Cursor if configured
+        await handleAutoOpenInCursor(targetPath, localConfig);
+    };
+
+    const handleAutoOpenInCursor = async (targetPath: string, localConfig: any): Promise<void> => {
+        const editorConfig = localConfig?.worktrees?.editor;
+        
+        // Check if auto-open is enabled and Cursor is preferred
+        if (editorConfig?.openOnSwitch && (editorConfig?.preferCursor || editorConfig?.command === 'cursor')) {
+            try {
+                // Check if cursor is available
+                await new Promise((resolve, reject) => {
+                    const proc = spawn('which', ['cursor'], { stdio: 'ignore' });
+                    proc.on('close', (code) => {
+                        if (code === 0) resolve('cursor');
+                        else reject(new Error('Cursor not found'));
+                    });
+                });
+
+                // Open Cursor in the worktree directory
+                spawn('cursor', [targetPath], {
+                    detached: true,
+                    stdio: 'ignore'
+                }).unref();
+
+                console.log('  ✓ Opened in Cursor');
+            } catch (error) {
+                console.log('  ⚠️  Cursor not found, skipping auto-open');
+            }
         }
     };
 

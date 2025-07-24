@@ -3,7 +3,7 @@ import { gitUtils } from '../utils/git';
 import { worktreeManager } from '../utils/worktreeManager';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import clipboardy from 'clipboardy';
+// Dynamic import for clipboardy ESM module
 import { spawn } from 'child_process';
 
 interface SwitchOptions {
@@ -165,6 +165,7 @@ async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manag
             message: `Selected: ${selectedWorktree.branch}. What would you like to do?`,
             choices: [
                 { name: '🔄 Switch to this worktree', value: 'switch' },
+                { name: '🚀 Switch and open in Cursor', value: 'switch_and_open' },
                 { name: '📝 Show detailed info', value: 'info' },
                 { name: '🗑️  Delete this worktree', value: 'delete' },
                 { name: '📂 Open in editor', value: 'editor' },
@@ -176,6 +177,10 @@ async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manag
     switch (additionalAction) {
         case 'switch':
             await handleWorktreeSwitch(selectedWorktree);
+            break;
+
+        case 'switch_and_open':
+            await handleWorktreeSwitchAndOpen(selectedWorktree);
             break;
 
         case 'info':
@@ -200,11 +205,56 @@ async function handleWorktreeSwitch(worktree: any) {
     console.log(chalk.cyan(`\nSwitching to ${worktree.branch}...`));
 
     // Copy the path to clipboard for easy pasting
-    await clipboardy.write(`cd ${worktree.path}`);
+    const clipboard = await import('clipboardy');
+    await clipboard.default.write(`cd ${worktree.path}`);
 
     console.log(chalk.green('✓') + ' To complete the switch, run:');
     console.log(chalk.yellow(`  cd ${worktree.path}`));
     console.log(chalk.gray('\n(Command copied to clipboard)'));
+
+    // Show status
+    if (worktree.status.hasUncommittedChanges) {
+        console.log(chalk.yellow('\n⚠ This worktree has uncommitted changes.'));
+    }
+
+    if (worktree.status.ahead > 0 || worktree.status.behind > 0) {
+        console.log(chalk.gray(`\nBranch is ${worktree.status.ahead} commits ahead and ${worktree.status.behind} commits behind.`));
+    }
+}
+
+async function handleWorktreeSwitchAndOpen(worktree: any) {
+    console.log(chalk.cyan(`\nSwitching to ${worktree.branch} and opening in Cursor...`));
+
+    // First, handle the directory switch
+    const clipboard = await import('clipboardy');
+    await clipboard.default.write(`cd ${worktree.path}`);
+
+    console.log(chalk.green('✓') + ' To complete the switch, run:');
+    console.log(chalk.yellow(`  cd ${worktree.path}`));
+    console.log(chalk.gray('(Command copied to clipboard)'));
+
+    // Then, try to open Cursor
+    try {
+        // Check if cursor is available
+        await new Promise((resolve, reject) => {
+            const proc = spawn('which', ['cursor'], { stdio: 'ignore' });
+            proc.on('close', (code) => {
+                if (code === 0) resolve('cursor');
+                else reject(new Error('Cursor not found'));
+            });
+        });
+
+        // Open Cursor in the worktree directory
+        spawn('cursor', [worktree.path], {
+            detached: true,
+            stdio: 'ignore'
+        }).unref();
+
+        console.log(chalk.green('✓') + ' Opened in Cursor');
+    } catch (error) {
+        console.log(chalk.yellow('⚠️  Cursor not found. Please install Cursor or use the regular switch option.'));
+        console.log(chalk.gray('You can download Cursor from: https://cursor.sh/'));
+    }
 
     // Show status
     if (worktree.status.hasUncommittedChanges) {
