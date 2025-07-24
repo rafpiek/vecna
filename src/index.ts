@@ -18,8 +18,8 @@ program
 
 program.command('setup', 'setup a new project').action(() => import('./commands/setup').then(i => i.default(config)));
 program.command('list', 'list all projects').action(() => import('./commands/list').then(i => i.default(config)));
-program.command('lint', 'lint files').action(() => import('./commands/lint').then(i => i.default(config, git, process.argv.slice(2))));
-program.command('test', 'run tests').action(() => import('./commands/test').then(i => i.default(config, git, process.argv.slice(2))));
+program.command('lint', 'lint files').action(() => { import('./commands/lint').then(i => i.default(config, git, process.argv.slice(2))) });
+program.command('test', 'run tests').action(() => { import('./commands/test').then(i => i.default(config, git, process.argv.slice(2))) });
 program.command('version', 'show version').action(() => import('./commands/version').then(i => i.default()));
 
 
