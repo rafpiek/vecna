@@ -5,6 +5,7 @@ import fs from 'fs-extra';
 import simpleGit from 'simple-git';
 import { configManager } from './utils/configManager';
 import { gitUtils } from './utils/git';
+import { worktreeCommand } from './commands/worktree';
 
 const program = new Command();
 
@@ -73,6 +74,8 @@ testCommand
     .option('-e, --uncommitted', 'test uncommitted changes only')
     .option('-c, --committed', 'test committed changes against main branch')
     .action((options) => import('./commands/test').then(i => i.default(config, git, 'rb', options)));
+
+program.addCommand(worktreeCommand);
 
 program
     .command('version')

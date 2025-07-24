@@ -1,7 +1,5 @@
-import {
-  copyConfigFiles,
-  runPostCreateScripts,
-} from './worktreeManager';
+import { simpleGit } from 'simple-git';
+import { gitUtils } from './git';
 
 interface WorktreeInfo {
   name: string;
@@ -41,4 +39,45 @@ interface WorktreeManager {
   cleanOrphanedStates(): Promise<void>;
 }
 
+export const worktreeManager = (git = simpleGit()): WorktreeManager => {
+    const gitRepo = gitUtils(git);
+
+    const listWorktrees = async (): Promise<WorktreeInfo[]> => {
+        const worktrees = await gitRepo.listWorktrees();
+
+        const worktreeInfoPromises = worktrees.map(async (worktree) => {
+            const [commitInfo, aheadBehind, hasUncommittedChanges] = await Promise.all([
+                gitRepo.getCommitInfo(worktree.branch),
+                gitRepo.getAheadBehind(worktree.branch),
+                gitRepo.hasUncommittedChanges(),
+            ]);
+
+            return {
+                name: worktree.branch,
+                branch: worktree.branch,
+                path: worktree.path,
+                isCurrent: worktree.isCurrent,
+                isActive: true, // Placeholder
+                lastCommit: {
+                    hash: commitInfo.hash,
+                    message: commitInfo.message,
+                    date: new Date(commitInfo.date),
+                },
+                status: {
+                    hasUncommittedChanges,
+                    ahead: aheadBehind.ahead,
+                    behind: aheadBehind.behind,
+                },
+                diskUsage: 'N/A', // Placeholder
+            };
+        });
+
+        return Promise.all(worktreeInfoPromises);
+    };
+
+    return {
+        listWorktrees,
+        // ... other functions will be implemented later
+    } as WorktreeManager;
+};
 // Implementations will be added in subsequent steps.
