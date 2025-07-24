@@ -34,6 +34,7 @@ export default (config: ConfigManager) => {
             if (await fs.pathExists(gemfilePath)) {
                 const gemfileContent = await fs.readFile(gemfilePath, 'utf-8');
                 if (gemfileContent.includes('rspec')) {
+                    if (!projectConfig.test) projectConfig.test = {};
                     projectConfig.test.rb = 'rspec';
                 }
             }
@@ -43,6 +44,7 @@ export default (config: ConfigManager) => {
             if (await fs.pathExists(packageJsonPath)) {
                 const packageJson = await fs.readJson(packageJsonPath);
                 if (packageJson.scripts?.lint?.includes('eslint')) {
+                    if (!projectConfig.linter) projectConfig.linter = {};
                     projectConfig.linter.js = 'eslint';
                 }
             }
