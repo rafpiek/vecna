@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import { Command } from 'commander';
 import { configManager } from '../utils/configManager';
 import { gitUtils } from '../utils/git';
+import { dependencyExists } from '../utils/dependencyCheck';
 
 type ConfigManager = ReturnType<typeof configManager>;
 type GitUtils = ReturnType<typeof gitUtils>;
@@ -54,10 +55,18 @@ export default (config: ConfigManager, git: GitUtils, argv: string[]) => {
             const rbFiles = filesToLint.filter(f => /\.rb$/.test(f));
 
             if (localConfig.linter?.js && jsFiles.length > 0) {
+                if (!await dependencyExists(localConfig.linter.js)) {
+                    console.error(`Linter "${localConfig.linter.js}" not found. Please install it.`);
+                    return;
+                }
                 runLinter(localConfig.linter.js, jsFiles, options.fix);
             }
 
             if (localConfig.linter?.rb && rbFiles.length > 0) {
+                if (!await dependencyExists(localConfig.linter.rb)) {
+                    console.error(`Linter "${localConfig.linter.rb}" not found. Please install it.`);
+                    return;
+                }
                 runLinter(localConfig.linter.rb, rbFiles, options.fix);
             }
         });

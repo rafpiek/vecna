@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import { Command } from 'commander';
 import { configManager } from '../utils/configManager';
 import { gitUtils } from '../utils/git';
+import { dependencyExists } from '../utils/dependencyCheck';
 
 type ConfigManager = ReturnType<typeof configManager>;
 type GitUtils = ReturnType<typeof gitUtils>;
@@ -51,6 +52,10 @@ export default (config: ConfigManager, git: GitUtils, argv: string[]) => {
             const rbTestFiles = filesToTest.filter(f => /_spec\.rb$/.test(f));
 
             if (localConfig.test?.rb && rbTestFiles.length > 0) {
+                if (!await dependencyExists(localConfig.test.rb)) {
+                    console.error(`Test runner "${localConfig.test.rb}" not found. Please install it.`);
+                    return;
+                }
                 runTests(localConfig.test.rb, rbTestFiles);
             }
         });

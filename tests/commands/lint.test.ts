@@ -3,8 +3,10 @@ import { configManager, ProjectConfig } from '../../src/utils/configManager';
 import { gitUtils } from '../../src/utils/git';
 import lintCommand from '../../src/commands/lint';
 import { spawn } from 'child_process';
+import { dependencyExists } from '../../src/utils/dependencyCheck';
 
 jest.mock('child_process');
+jest.mock('../../src/utils/dependencyCheck');
 
 describe('lint command', () => {
     let mockConfigManager: DeepMockProxy<ReturnType<typeof configManager>>;
@@ -27,6 +29,24 @@ describe('lint command', () => {
         consoleErrorSpy.mockRestore();
     });
 
+    it('should show an error if linter is not found', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        mockGitUtils.isGitRepo.mockResolvedValue(true);
+        const localConfig: ProjectConfig = {
+            name: 'test-project',
+            path: '/path/to/project',
+            linter: { js: 'nonexistent-linter' }
+        };
+        mockConfigManager.readLocalConfig.mockResolvedValue(localConfig);
+        (dependencyExists as jest.Mock).mockResolvedValue(false);
+
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
+        await lintCommand(mockConfigManager, mockGitUtils, argv);
+
+        expect(console.error).toHaveBeenCalledWith('Linter "nonexistent-linter" not found. Please install it.');
+        consoleErrorSpy.mockRestore();
+    });
+
     it('should lint all modified files', async () => {
         mockGitUtils.isGitRepo.mockResolvedValue(true);
         const localConfig: ProjectConfig = {
@@ -39,6 +59,7 @@ describe('lint command', () => {
             committed: ['file1.js', 'file2.rb'],
             uncommitted: ['file3.ts']
         });
+        (dependencyExists as jest.Mock).mockResolvedValue(true);
 
         const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
         await lintCommand(mockConfigManager, mockGitUtils, argv);
@@ -59,6 +80,7 @@ describe('lint command', () => {
             committed: ['file1.js'],
             uncommitted: ['file2.ts']
         });
+        (dependencyExists as jest.Mock).mockResolvedValue(true);
 
         const argv = ['/usr/bin/node', '/path/to/vecna', 'all', '-e'];
         await lintCommand(mockConfigManager, mockGitUtils, argv);
