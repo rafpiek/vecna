@@ -33,18 +33,18 @@ export const gitUtils = (git: SimpleGit) => ({
         };
     },
     addWorktree: async (path: string, branch: string): Promise<void> => {
-        await git.worktree('add', path, branch);
+        await git.raw('worktree', 'add', path, branch);
     },
     removeWorktree: async (path: string, force?: boolean): Promise<void> => {
-        const args = ['remove'];
+        const args = ['worktree', 'remove'];
         if (force) {
             args.push('--force');
         }
         args.push(path);
-        await git.worktree(...args);
+        await git.raw(...args);
     },
     listWorktrees: async (): Promise<GitWorktree[]> => {
-        const worktreeOutput = await git.worktree('list', '--porcelain');
+        const worktreeOutput = await git.raw('worktree', 'list', '--porcelain');
         const worktrees: GitWorktree[] = [];
         const lines = worktreeOutput.split('\n').filter(Boolean);
 
@@ -54,7 +54,7 @@ export const gitUtils = (git: SimpleGit) => ({
             const path = line.substring('worktree '.length);
             const branchLine = lines[i + 2];
             const branch = branchLine.substring('branch refs/heads/'.length);
-            const isCurrent = lines.some(l => l.startsWith('HEAD ') && lines.indexOf(l) < i + 4);
+            const isCurrent = lines.some((l: string) => l.startsWith('HEAD ') && lines.indexOf(l) < i + 4);
 
             worktrees.push({
               path,
@@ -67,7 +67,7 @@ export const gitUtils = (git: SimpleGit) => ({
         return worktrees;
     },
     pruneWorktrees: async (): Promise<void> => {
-        await git.worktree('prune');
+        await git.raw('worktree', 'prune');
     },
     createBranch: async (name: string, from?: string): Promise<void> => {
         const args = ['-b', name];
@@ -89,6 +89,9 @@ export const gitUtils = (git: SimpleGit) => ({
     },
     getCommitInfo: async (ref: string): Promise<CommitInfo> => {
         const log = await git.log({ [ref]: null, n: 1 });
+        if (!log.latest) {
+            throw new Error(`Could not get commit info for ref: ${ref}`);
+        }
         return {
             hash: log.latest.hash,
             message: log.latest.message,
@@ -96,8 +99,7 @@ export const gitUtils = (git: SimpleGit) => ({
         };
     },
     getAheadBehind: async (branch: string, against: string = 'main'): Promise<{ ahead: number, behind: number }> => {
-        const log = await git.log({ from: against, to: branch });
-        const revList = await git.raw(['rev-list', '--left-right', '--count', `${against}...${branch}`]);
+        const revList = await git.raw('rev-list', '--left-right', '--count', `${against}...${branch}`);
         const [behind, ahead] = revList.trim().split('\t').map(Number);
         return { ahead, behind };
     }

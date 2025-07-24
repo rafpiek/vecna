@@ -6,6 +6,7 @@ import simpleGit from 'simple-git';
 import { configManager } from './utils/configManager';
 import { gitUtils } from './utils/git';
 import { worktreeCommand } from './commands/worktree';
+import { startCommand } from './commands/start';
 
 const program = new Command();
 
@@ -21,6 +22,8 @@ program
     .command('setup')
     .description('setup a new project')
     .action(() => import('./commands/setup').then(i => i.default(config)));
+
+program.addCommand(startCommand);
 
 program
     .command('list')

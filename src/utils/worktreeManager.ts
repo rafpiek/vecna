@@ -1,5 +1,8 @@
 import { simpleGit } from 'simple-git';
 import { gitUtils } from './git';
+import { homedir } from 'os';
+import path from 'path';
+import fs from 'fs-extra';
 
 interface WorktreeInfo {
   name: string;
@@ -42,6 +45,38 @@ interface WorktreeManager {
 export const worktreeManager = (git = simpleGit()): WorktreeManager => {
     const gitRepo = gitUtils(git);
 
+    const createWorktree = async (branchName: string, options: CreateOptions = {}): Promise<WorktreeInfo> => {
+        const { from = 'main', noInstall = false } = options;
+        const worktreeDir = path.join(homedir(), 'dev', 'trees');
+        const worktreePath = path.join(worktreeDir, branchName.replace(/\//g, '-'));
+
+        if (fs.existsSync(worktreePath)) {
+            throw new Error(`Worktree path already exists: ${worktreePath}`);
+        }
+
+        const currentBranch = await gitRepo.getCurrentBranch();
+        if (currentBranch === branchName) {
+            await git.checkout(from);
+        }
+
+        await gitRepo.addWorktree(worktreePath, branchName);
+
+        // Stubs for now
+        await copyConfigFiles(worktreePath);
+        if (!noInstall) {
+            await runPostCreateScripts(worktreePath);
+        }
+
+        const worktrees = await listWorktrees();
+        const newWorktree = worktrees.find(w => w.path === worktreePath);
+
+        if (!newWorktree) {
+            throw new Error('Failed to create or find the new worktree.');
+        }
+
+        return newWorktree;
+    };
+
     const listWorktrees = async (): Promise<WorktreeInfo[]> => {
         const worktrees = await gitRepo.listWorktrees();
 
@@ -75,8 +110,21 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         return Promise.all(worktreeInfoPromises);
     };
 
+    const copyConfigFiles = async (targetPath: string, patterns?: string[]): Promise<void> => {
+        // Implementation to follow
+        console.log(`Copying config files to ${targetPath} with patterns ${patterns}`);
+    };
+
+    const runPostCreateScripts = async (path: string): Promise<void> => {
+        // Implementation to follow
+        console.log(`Running post-create scripts in ${path}`);
+    };
+
     return {
+        createWorktree,
         listWorktrees,
+        copyConfigFiles,
+        runPostCreateScripts,
         // ... other functions will be implemented later
     } as WorktreeManager;
 };
