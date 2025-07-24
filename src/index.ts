@@ -21,7 +21,7 @@ program
 program
     .command('setup')
     .description('setup a new project')
-    .action(() => import('./commands/setup').then(i => i.default(config)));
+    .action(() => import('./commands/setup').then(i => i.default(gitInstance, config)));
 
 program
     .command('start')
@@ -42,6 +42,14 @@ program
     .command('shell-install')
     .description('Install shell integration for better worktree switching')
     .action(() => import('./commands/shell-install').then(i => i.default()));
+
+program
+    .command('tidy')
+    .description('Clean up merged branches and associated worktrees')
+    .option('--dry-run', 'Show what would be cleaned without doing it')
+    .option('--force', 'Skip confirmation prompt')
+    .option('--keep-pattern <pattern>', 'Protect branches matching pattern (e.g., "release/*")')
+    .action((options) => import('./commands/tidy').then(i => i.default(gitInstance, options)));
 
 program
     .command('list')

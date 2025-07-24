@@ -3,18 +3,30 @@
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import path from 'path';
+import { SimpleGit } from 'simple-git';
 import { configManager, ProjectConfig } from '../utils/configManager';
+import { gitUtils } from '../utils/git';
 
 type ConfigManager = ReturnType<typeof configManager>;
 
-export default async (config: ConfigManager) => {
+export default async (gitInstance: SimpleGit, config: ConfigManager) => {
+    const git = gitUtils(gitInstance);
     try {
+        // Find git root directory
+        const gitRoot = await git.findGitRoot(process.cwd());
+        
+        // Verify this is the main repository (not a worktree)
+        const isMainRepo = await git.isMainRepository(gitRoot);
+        
+        if (!isMainRepo) {
+            throw new Error('Setup must be run from the main repository directory, not a worktree');
+        }
         const answers = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'projectName',
                 message: 'Enter the project name:',
-                default: path.basename(process.cwd()),
+                default: path.basename(gitRoot),
             },
             {
                 type: 'input',
@@ -44,7 +56,7 @@ export default async (config: ConfigManager) => {
 
         const projectConfig: ProjectConfig = {
             name: answers.projectName,
-            path: process.cwd(),
+            path: gitRoot,
             mainBranch: answers.mainBranch,
             linter: {
                 js: answers.jsLinter || undefined,

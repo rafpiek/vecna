@@ -1,4 +1,6 @@
 import { SimpleGit, simpleGit, SimpleGitOptions } from 'simple-git';
+import path from 'path';
+import fs from 'fs-extra';
 
 export interface ModifiedFiles {
     committed: string[];
@@ -108,5 +110,61 @@ export const gitUtils = (git: SimpleGit) => ({
     },
     pull: async (): Promise<void> => {
         await git.pull();
+    },
+    
+    // New functions for tidy command
+    findGitRoot: async (startPath: string): Promise<string> => {
+        let currentPath = path.resolve(startPath);
+        
+        while (currentPath !== path.dirname(currentPath)) {
+            if (await fs.pathExists(path.join(currentPath, '.git'))) {
+                return currentPath;
+            }
+            currentPath = path.dirname(currentPath);
+        }
+        
+        throw new Error('Not in a git repository');
+    },
+    
+    isMainRepository: async (repoPath: string): Promise<boolean> => {
+        const gitDir = path.join(repoPath, '.git');
+        
+        if (await fs.pathExists(gitDir)) {
+            const stat = await fs.stat(gitDir);
+            // If .git is a directory, it's the main repo
+            // If .git is a file, it's a worktree (contains "gitdir: ..." pointing to main repo)
+            return stat.isDirectory();
+        }
+        
+        return false;
+    },
+    
+    getLocalBranches: async (): Promise<string[]> => {
+        const branches = await git.branchLocal();
+        return branches.all;
+    },
+    
+    doesRemoteBranchExist: async (branch: string): Promise<boolean> => {
+        try {
+            const result = await git.raw(['ls-remote', '--heads', 'origin', branch]);
+            return result.trim().length > 0;
+        } catch {
+            return false;
+        }
+    },
+    
+    resetUncommittedChanges: async (worktreePath: string): Promise<void> => {
+        const worktreeGit = simpleGit(worktreePath);
+        await worktreeGit.reset(['--hard', 'HEAD']);
+        await worktreeGit.clean('f', ['-d']); // Remove untracked files
+    },
+    
+    deleteBranch: async (branchName: string, force: boolean = false): Promise<void> => {
+        const args = force ? ['-D', branchName] : ['-d', branchName];
+        await git.branch(args);
+    },
+    
+    fetch: async (): Promise<void> => {
+        await git.fetch();
     }
 });
