@@ -16,8 +16,8 @@ describe('setup command', () => {
     });
 
     it('should prompt for project name and create config files', async () => {
-        const promptSpy = jest.spyOn(inquirer, 'prompt').mockResolvedValue({ projectName: 'test-project' } as any);
-        const pathExistsSpy = jest.spyOn(fs, 'pathExists').mockResolvedValue(false as any);
+        const promptSpy = jest.spyOn(inquirer, 'prompt').mockImplementation(jest.fn().mockResolvedValue({ projectName: 'test-project' }));
+        const pathExistsSpy = jest.spyOn(fs, 'pathExists').mockImplementation(jest.fn().mockResolvedValue(false));
 
         await setupCommand(mockConfigManager);
 
@@ -33,15 +33,15 @@ describe('setup command', () => {
     });
 
     it('should detect rspec and eslint', async () => {
-        const promptSpy = jest.spyOn(inquirer, 'prompt').mockResolvedValue({ projectName: 'test-project' } as any);
-        const pathExistsSpy = jest.spyOn(fs, 'pathExists').mockImplementation(path => {
+        const promptSpy = jest.spyOn(inquirer, 'prompt').mockImplementation(jest.fn().mockResolvedValue({ projectName: 'test-project' }));
+        const pathExistsSpy = jest.spyOn(fs, 'pathExists').mockImplementation(jest.fn().mockImplementation(path => {
             if (typeof path === 'string') {
                 return Promise.resolve(path.endsWith('Gemfile') || path.endsWith('package.json'));
             }
             return Promise.resolve(false);
-        });
-        const readFileSpy = jest.spyOn(fs, 'readFile').mockResolvedValue('gem "rspec"' as any);
-        const readJsonSpy = jest.spyOn(fs, 'readJson').mockResolvedValue({ scripts: { lint: 'eslint' } });
+        }));
+        const readFileSpy = jest.spyOn(fs, 'readFile').mockImplementation(jest.fn().mockResolvedValue('gem "rspec"'));
+        const readJsonSpy = jest.spyOn(fs, 'readJson').mockImplementation(jest.fn().mockResolvedValue({ scripts: { lint: 'eslint' } }));
 
         await setupCommand(mockConfigManager);
 
