@@ -30,4 +30,18 @@ describe('gitUtils', () => {
             expect(uncommitted).toEqual(['file3.js', 'file4.rb']);
         });
     });
+
+    describe('isGitRepo', () => {
+        it('should return true if it is a git repo', async () => {
+            mockGit.checkIsRepo.mockResolvedValue(true);
+            const isRepo = await utils.isGitRepo();
+            expect(isRepo).toBe(true);
+        });
+
+        it('should return false if it is not a git repo', async () => {
+            mockGit.checkIsRepo.mockResolvedValue(false);
+            const isRepo = await utils.isGitRepo();
+            expect(isRepo).toBe(false);
+        });
+    });
 });

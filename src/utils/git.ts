@@ -6,6 +6,9 @@ export interface ModifiedFiles {
 }
 
 export const gitUtils = (git: SimpleGit) => ({
+    isGitRepo: async (): Promise<boolean> => {
+        return await git.checkIsRepo();
+    },
     getModifiedFiles: async (mainBranch: string = 'main'): Promise<ModifiedFiles> => {
         const committed = (await git.diff(['--name-only', `${mainBranch}...HEAD`])).split('\n').filter(Boolean);
 

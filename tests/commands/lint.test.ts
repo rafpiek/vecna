@@ -18,7 +18,17 @@ describe('lint command', () => {
         spawnSpy = (spawn as jest.Mock).mockReturnValue({ on: jest.fn() });
     });
 
+    it('should show an error if not in a git repo', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        mockGitUtils.isGitRepo.mockResolvedValue(false);
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
+        await lintCommand(mockConfigManager, mockGitUtils, argv);
+        expect(console.error).toHaveBeenCalledWith('This command must be run inside a git repository.');
+        consoleErrorSpy.mockRestore();
+    });
+
     it('should lint all modified files', async () => {
+        mockGitUtils.isGitRepo.mockResolvedValue(true);
         const localConfig: ProjectConfig = {
             name: 'test-project',
             path: '/path/to/project',
@@ -38,6 +48,7 @@ describe('lint command', () => {
     });
 
     it('should only lint uncommitted files with -e flag', async () => {
+        mockGitUtils.isGitRepo.mockResolvedValue(true);
         const localConfig: ProjectConfig = {
             name: 'test-project',
             path: '/path/to/project',

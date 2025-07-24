@@ -26,6 +26,11 @@ export default (config: ConfigManager, git: GitUtils, argv: string[]) => {
         .option('-e, --uncommitted', 'Test uncommitted changes only')
         .option('-c, --committed', 'Test committed changes against main branch')
         .action(async (options) => {
+            const isGitRepo = await git.isGitRepo();
+            if (!isGitRepo) {
+                console.error('This command must be run inside a git repository.');
+                return;
+            }
             const localConfig = await config.readLocalConfig();
             if (!localConfig) {
                 console.error('No .vecna.json found. Run "vecna setup" first.');

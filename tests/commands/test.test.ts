@@ -18,7 +18,17 @@ describe('test command', () => {
         spawnSpy = (spawn as jest.Mock).mockReturnValue({ on: jest.fn() });
     });
 
+    it('should show an error if not in a git repo', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        mockGitUtils.isGitRepo.mockResolvedValue(false);
+        const argv = ['/usr/bin/node', '/path/to/vecna', 'all'];
+        await testCommand(mockConfigManager, mockGitUtils, argv);
+        expect(console.error).toHaveBeenCalledWith('This command must be run inside a git repository.');
+        consoleErrorSpy.mockRestore();
+    });
+
     it('should run tests for all modified ruby test files', async () => {
+        mockGitUtils.isGitRepo.mockResolvedValue(true);
         const localConfig: ProjectConfig = {
             name: 'test-project',
             path: '/path/to/project',
@@ -37,6 +47,7 @@ describe('test command', () => {
     });
 
     it('should only run tests for committed files with -c flag', async () => {
+        mockGitUtils.isGitRepo.mockResolvedValue(true);
         const localConfig: ProjectConfig = {
             name: 'test-project',
             path: '/path/to/project',
