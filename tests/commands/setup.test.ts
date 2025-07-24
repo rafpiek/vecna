@@ -25,8 +25,8 @@ describe('setup command', () => {
     });
 
     it('should prompt for project name and create config files', async () => {
-        mockedInquirer.prompt.mockResolvedValue({ projectName: 'test-project' });
-        mockedFs.pathExists.mockResolvedValue(false);
+        (mockedInquirer.prompt as jest.Mock).mockResolvedValue({ projectName: 'test-project' });
+        (mockedFs.pathExists as jest.Mock).mockResolvedValue(false);
 
         await setupCommand(mockConfigManager);
 
@@ -42,17 +42,17 @@ describe('setup command', () => {
     });
 
     it('should detect rspec and eslint', async () => {
-        mockedInquirer.prompt.mockResolvedValue({ projectName: 'test-project' });
+        (mockedInquirer.prompt as jest.Mock).mockResolvedValue({ projectName: 'test-project' });
 
-        mockedFs.pathExists.mockImplementation(path => {
+        (mockedFs.pathExists as jest.Mock).mockImplementation(path => {
             if (typeof path === 'string') {
                 return Promise.resolve(path.endsWith('Gemfile') || path.endsWith('package.json'));
             }
             return Promise.resolve(false);
         });
 
-        mockedFs.readFile.mockResolvedValue('gem "rspec"');
-        mockedFs.readJson.mockResolvedValue({ scripts: { lint: 'eslint' } });
+        (mockedFs.readFile as jest.Mock).mockResolvedValue('gem "rspec"');
+        (mockedFs.readJson as jest.Mock).mockResolvedValue({ scripts: { lint: 'eslint' } });
 
         await setupCommand(mockConfigManager);
 
