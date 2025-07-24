@@ -3,7 +3,7 @@
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import path from 'path';
-import { configManager } from '../utils/configManager';
+import { configManager, ProjectConfig } from '../utils/configManager';
 
 type ConfigManager = ReturnType<typeof configManager>;
 
@@ -23,7 +23,7 @@ export default (config: ConfigManager) => {
 
             const { projectName } = answers;
 
-            const projectConfig = {
+            const projectConfig: Omit<ProjectConfig, 'path'> = {
                 name: projectName,
                 linter: {},
                 test: {}
