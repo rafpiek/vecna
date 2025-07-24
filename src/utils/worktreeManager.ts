@@ -43,6 +43,7 @@ interface WorktreeManager {
   saveWorktreeState(info: WorktreeInfo): Promise<void>;
   getWorktreeState(name: string): Promise<any>;
   cleanOrphanedStates(): Promise<void>;
+  cleanWorktreeState(name: string): Promise<void>;
 }
 
 export const worktreeManager = (git = simpleGit()): WorktreeManager => {
@@ -190,12 +191,19 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         }
     };
 
+    const cleanWorktreeState = async (name: string): Promise<void> => {
+        // Placeholder for cleaning up worktree state from vecna.json
+        // This would remove the worktree entry from the configuration
+        console.log(`Cleaning up state for worktree: ${name}`);
+    };
+
     return {
         create,
         createWorktree,
         listWorktrees,
         copyConfigFiles,
         runPostCreateScripts,
+        cleanWorktreeState,
         // ... other functions will be implemented later
     } as WorktreeManager;
 };
