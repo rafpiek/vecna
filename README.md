@@ -17,7 +17,7 @@ vecna start --branch feature/user-auth
 vecna switch
 
 # Open worktree in Cursor editor
-# Select "🚀 Switch and open in Cursor" option
+vecna switch -e
 ```
 
 ## 📋 Table of Contents
@@ -128,16 +128,20 @@ vecna start --branch quick-test --no-install
 Interactive worktree switching with rich UI.
 
 ```bash
-# Interactive selection
+# Interactive selection (directory switch only)
 vecna switch
+
+# Interactive selection with editor opening
+vecna switch -e
+vecna switch --editor
 
 # JSON output for scripts
 vecna switch --json
 ```
 
 **Interactive Features:**
-- 🔄 **Switch to worktree** - Navigate to directory
-- 🚀 **Switch and open in Cursor** - Navigate + open editor
+- 🔄 **Switch to worktree** - Navigate to directory (default behavior)
+- 🚀 **Switch and open in editor** - Navigate + open editor (with `-e` flag)
 - 📝 **Show detailed info** - Commit history, status
 - 🗑️ **Delete worktree** - Safe removal with confirmations
 - 📂 **Open in editor** - Launch configured editor
@@ -330,8 +334,7 @@ Stores user-wide settings and project registry:
 vecna start --branch feature/user-authentication
 
 # Switch between main and feature work
-vecna switch
-# Select: feature/user-authentication → 🚀 Switch and open in Cursor
+vecna switch -e  # Opens selected worktree in Cursor
 
 # When done, clean up
 vecna worktree remove feature-user-authentication
@@ -382,8 +385,7 @@ Vecna provides first-class support for [Cursor](https://cursor.sh/), the AI-powe
 
 **Interactive Switch:**
 ```bash
-vecna switch
-# Select worktree → 🚀 Switch and open in Cursor
+vecna switch -e  # Select worktree and open in Cursor
 ```
 
 **Auto-open Configuration:**

@@ -8,6 +8,7 @@ import { spawn } from 'child_process';
 
 interface SwitchOptions {
     json?: boolean;
+    editor?: boolean;
 }
 
 export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
@@ -36,7 +37,7 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
         }
 
         // Enhanced interactive selection with actions
-        await showInteractiveWorktreeSelector(worktrees, git, manager);
+        await showInteractiveWorktreeSelector(worktrees, git, manager, options.editor || false);
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -49,7 +50,7 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
     }
 };
 
-async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manager: any) {
+async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manager: any, shouldOpenInEditor: boolean = false) {
     let selectedWorktree = null;
     let showHelp = false;
 
@@ -164,8 +165,7 @@ async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manag
             name: 'additionalAction',
             message: `Selected: ${selectedWorktree.branch}. What would you like to do?`,
             choices: [
-                { name: '🔄 Switch to this worktree', value: 'switch' },
-                { name: '🚀 Switch and open in Cursor', value: 'switch_and_open' },
+                { name: shouldOpenInEditor ? '🚀 Switch and open in editor' : '🔄 Switch to this worktree', value: 'switch' },
                 { name: '📝 Show detailed info', value: 'info' },
                 { name: '🗑️  Delete this worktree', value: 'delete' },
                 { name: '📂 Open in editor', value: 'editor' },
@@ -176,11 +176,11 @@ async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manag
 
     switch (additionalAction) {
         case 'switch':
-            await handleWorktreeSwitch(selectedWorktree);
-            break;
-
-        case 'switch_and_open':
-            await handleWorktreeSwitchAndOpen(selectedWorktree);
+            if (shouldOpenInEditor) {
+                await handleWorktreeSwitchAndOpen(selectedWorktree);
+            } else {
+                await handleWorktreeSwitch(selectedWorktree);
+            }
             break;
 
         case 'info':

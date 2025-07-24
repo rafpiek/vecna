@@ -35,6 +35,7 @@ program
     .command('switch')
     .description('Switch between worktrees interactively')
     .option('--json', 'Output result in JSON format')
+    .option('-e, --editor', 'Open selected worktree in editor (Cursor)')
     .action((options) => import('./commands/switch').then(i => i.default(gitInstance, options)));
 
 program
