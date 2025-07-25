@@ -1,6 +1,5 @@
 import { SimpleGit } from 'simple-git';
 import { gitUtils } from '../utils/git';
-import { worktreeManager } from '../utils/worktreeManager';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 // Dynamic import for clipboardy ESM module
@@ -13,11 +12,10 @@ interface SwitchOptions {
 
 export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
     const git = gitUtils(gitInstance);
-    const manager = worktreeManager(gitInstance);
 
     try {
-        // Get all worktrees
-        const worktrees = await manager.listWorktrees();
+        // Get basic worktree list (just paths and branches)
+        const worktrees = await git.listWorktrees();
 
         if (worktrees.length === 0) {
             if (options.json) {
@@ -28,16 +26,20 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
             return;
         }
 
-        // If JSON mode, don't show interactive prompt
+        // If JSON mode, output simple worktree list
         if (options.json) {
-            // In JSON mode, we need to handle this differently
-            // For now, just return an error
-            console.log(JSON.stringify({ error: 'Interactive mode required' }));
-            process.exit(1);
+            console.log(JSON.stringify(worktrees.map(wt => ({
+                branch: wt.branch,
+                path: wt.path
+            }))));
+            return;
         }
 
-        // Enhanced interactive selection with actions
-        await showInteractiveWorktreeSelector(worktrees, git, manager, options.editor || false);
+        // Check if we should output shell commands for direct execution
+        const isShellMode = process.env.VECNA_SHELL_MODE === 'true';
+
+        // Simple interactive selection
+        await showSimpleWorktreeSelector(worktrees, options.editor || false, isShellMode);
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -50,290 +52,110 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
     }
 };
 
-async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manager: any, shouldOpenInEditor: boolean = false) {
-    let selectedWorktree = null;
-    let showHelp = false;
+async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: boolean = false, isShellMode: boolean = false) {
+    let selectedWorktree;
 
-    while (true) {
-        console.clear();
+    if (isShellMode) {
+        // In shell mode, use a simple numbered list without colors
+        process.stderr.write('Select Worktree:\n');
+        worktrees.forEach((wt, index) => {
+            process.stderr.write(`${index + 1}. ${wt.branch} → ${wt.path}\n`);
+        });
+        process.stderr.write('Enter choice (1-' + worktrees.length + '): ');
 
-        // Header
-        console.log(chalk.cyan.bold('🌳 Vecna Worktree Switcher\n'));
+        // Read input synchronously
+        const choice = await new Promise<number>((resolve) => {
+            process.stdin.once('data', (data) => {
+                const num = parseInt(data.toString().trim());
+                resolve(num);
+            });
+        });
 
-        if (showHelp) {
-            console.log(chalk.gray('Keyboard shortcuts:'));
-            console.log(chalk.gray('  ↑/↓  Navigate'));
-            console.log(chalk.gray('  Enter Switch to worktree'));
-            console.log(chalk.gray('  d     Delete worktree'));
-            console.log(chalk.gray('  i     Show worktree info'));
-            console.log(chalk.gray('  o     Open in editor'));
-            console.log(chalk.gray('  r     Refresh list'));
-            console.log(chalk.gray('  h     Toggle this help'));
-            console.log(chalk.gray('  q     Quit'));
-            console.log('');
-        } else {
-            console.log(chalk.gray('Press h for help\n'));
+        if (choice < 1 || choice > worktrees.length) {
+            process.stderr.write('Invalid choice\n');
+            process.exit(1);
         }
 
-        // Prepare choices for inquirer with enhanced display
-        const choices: any[] = worktrees.map((wt, index) => {
-            let status = '';
-            let statusColor = chalk.gray;
+        selectedWorktree = worktrees[choice - 1];
+    } else {
+        // Normal interactive mode with colors
+        console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
 
-            if (wt.isCurrent) {
-                status = '● current';
-                statusColor = chalk.green;
-            } else if (wt.status.hasUncommittedChanges) {
-                status = '● changes';
-                statusColor = chalk.yellow;
-            } else {
-                status = '○ clean';
-                statusColor = chalk.gray;
-            }
-
-            const lastCommitDate = new Date(wt.lastCommit.date).toLocaleDateString();
-            const branchDisplay = wt.branch.length > 25 ? wt.branch.substring(0, 22) + '...' : wt.branch;
-
-            // Show ahead/behind info
-            let syncStatus = '';
-            if (wt.status.ahead > 0 || wt.status.behind > 0) {
-                syncStatus = chalk.blue(`↑${wt.status.ahead}`) + chalk.red(`↓${wt.status.behind}`);
-            }
-
+        // Simple choices - just branch name and path
+        const choices: any[] = worktrees.map((wt) => {
+            const branchDisplay = wt.branch.length > 40 ? wt.branch.substring(0, 37) + '...' : wt.branch;
             return {
-                name: `${statusColor(status.padEnd(12))} ${branchDisplay.padEnd(28)} ${chalk.gray(lastCommitDate.padEnd(12))} ${syncStatus}`,
-                value: { worktree: wt, action: 'switch' },
+                name: `${branchDisplay.padEnd(40)} ${chalk.gray('→')} ${wt.path}`,
+                value: wt,
                 short: wt.branch
             };
         });
 
-        // Add action choices
-        choices.push(
-            new inquirer.Separator(),
-            { name: chalk.cyan('🔄 Refresh list'), value: { action: 'refresh' } },
-            { name: chalk.gray('❓ Toggle help'), value: { action: 'help' } },
-            { name: chalk.red('❌ Quit'), value: { action: 'quit' } }
-        );
-
-        const { selection } = await inquirer.prompt([
+        const result = await inquirer.prompt([
             {
                 type: 'list',
-                name: 'selection',
-                message: 'Select worktree or action:',
+                name: 'selectedWorktree',
+                message: 'Choose worktree to navigate to:',
                 choices,
                 pageSize: Math.min(15, choices.length),
                 loop: false
             }
         ]);
-
-        // Handle the selection
-        if (selection.action === 'refresh') {
-            // Refresh the worktree list
-            const updatedWorktrees = await manager.listWorktrees();
-            worktrees.splice(0, worktrees.length, ...updatedWorktrees);
-            continue;
-        }
-
-        if (selection.action === 'help') {
-            showHelp = !showHelp;
-            continue;
-        }
-
-        if (selection.action === 'quit') {
-            console.log(chalk.gray('Goodbye!'));
-            return;
-        }
-
-        if (selection.action === 'switch') {
-            selectedWorktree = selection.worktree;
-            break;
-        }
+        selectedWorktree = result.selectedWorktree;
     }
 
-    if (!selectedWorktree) return;
+    if (isShellMode) {
+        // In shell mode, output commands for the shell function to execute
+        console.log(`cd "${selectedWorktree.path}"`);
+        if (shouldOpenInEditor) {
+            // Try to open editor
+            const editors = ['code', 'cursor', 'subl'];
+            for (const editor of editors) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const proc = spawn('which', [editor], { stdio: 'ignore' });
+                        proc.on('close', (code) => {
+                            if (code === 0) resolve(editor);
+                            else reject();
+                        });
+                    });
+                    console.log(`${editor} "${selectedWorktree.path}" &`);
+                    break;
+                } catch {
+                    // Try next editor
+                }
+            }
+        }
+    } else {
+        // Normal mode - show instructions
+        console.log(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
+        
+        // Copy the path to clipboard for easy pasting
+        let clipboardSuccess = false;
+        try {
+            const clipboard = await import('clipboardy');
+            await clipboard.default.write(`cd ${selectedWorktree.path}`);
+            clipboardSuccess = true;
+        } catch (error) {
+            // Clipboard functionality is optional
+        }
 
-    // Handle worktree switching
-    if (selectedWorktree.isCurrent) {
-        console.log(chalk.gray('Already in this worktree.'));
+        console.log(chalk.green('✓') + ' To navigate, run:');
+        console.log(chalk.yellow(`  cd ${selectedWorktree.path}`));
+        if (clipboardSuccess) {
+            console.log(chalk.gray('\n(Command copied to clipboard)'));
+        }
+        
+        console.log(chalk.gray('\nTip: For automatic navigation, add this to your shell:'));
+        console.log(chalk.blue('  vecna() { eval "$(VECNA_SHELL_MODE=true command vecna "$@")"; }'));
+
+        // Optionally open in editor
         if (shouldOpenInEditor) {
             await openInEditor(selectedWorktree);
         }
-        return;
-    }
-
-    // Check if user wants to perform additional actions
-    const { additionalAction } = await inquirer.prompt([
-        {
-            type: 'list',
-            name: 'additionalAction',
-            message: `Selected: ${selectedWorktree.branch}. What would you like to do?`,
-            choices: [
-                { name: shouldOpenInEditor ? '🚀 Switch and open in editor' : '🔄 Switch to this worktree', value: 'switch' },
-                { name: '📝 Show detailed info', value: 'info' },
-                { name: '🗑️  Delete this worktree', value: 'delete' },
-                { name: '📂 Open in editor', value: 'editor' },
-                { name: '❌ Cancel', value: 'cancel' }
-            ]
-        }
-    ]);
-
-    switch (additionalAction) {
-        case 'switch':
-            if (shouldOpenInEditor) {
-                await handleWorktreeSwitchAndOpen(selectedWorktree);
-            } else {
-                await handleWorktreeSwitch(selectedWorktree);
-            }
-            break;
-
-        case 'info':
-            await showWorktreeInfo(selectedWorktree);
-            break;
-
-        case 'delete':
-            await handleWorktreeDelete(selectedWorktree, git, manager);
-            break;
-
-        case 'editor':
-            await openInEditor(selectedWorktree);
-            break;
-
-        case 'cancel':
-            console.log(chalk.gray('Operation cancelled.'));
-            break;
     }
 }
 
-async function handleWorktreeSwitch(worktree: any) {
-    console.log(chalk.cyan(`\nSwitching to ${worktree.branch}...`));
-
-    // Copy the path to clipboard for easy pasting
-    const clipboard = await import('clipboardy');
-    await clipboard.default.write(`cd ${worktree.path}`);
-
-    console.log(chalk.green('✓') + ' To complete the switch, run:');
-    console.log(chalk.yellow(`  cd ${worktree.path}`));
-    console.log(chalk.gray('\n(Command copied to clipboard)'));
-
-    // Show status
-    if (worktree.status.hasUncommittedChanges) {
-        console.log(chalk.yellow('\n⚠ This worktree has uncommitted changes.'));
-    }
-
-    if (worktree.status.ahead > 0 || worktree.status.behind > 0) {
-        console.log(chalk.gray(`\nBranch is ${worktree.status.ahead} commits ahead and ${worktree.status.behind} commits behind.`));
-    }
-}
-
-async function handleWorktreeSwitchAndOpen(worktree: any) {
-    console.log(chalk.cyan(`\nSwitching to ${worktree.branch} and opening in Cursor...`));
-
-    // First, handle the directory switch
-    const clipboard = await import('clipboardy');
-    await clipboard.default.write(`cd ${worktree.path}`);
-
-    console.log(chalk.green('✓') + ' To complete the switch, run:');
-    console.log(chalk.yellow(`  cd ${worktree.path}`));
-    console.log(chalk.gray('(Command copied to clipboard)'));
-
-    // Then, try to open Cursor
-    try {
-        // Check if cursor is available
-        await new Promise((resolve, reject) => {
-            const proc = spawn('which', ['cursor'], { stdio: 'ignore' });
-            proc.on('close', (code) => {
-                if (code === 0) resolve('cursor');
-                else reject(new Error('Cursor not found'));
-            });
-        });
-
-        // Open Cursor in the worktree directory
-        spawn('cursor', [worktree.path], {
-            detached: true,
-            stdio: 'ignore'
-        }).unref();
-
-        console.log(chalk.green('✓') + ' Opened in Cursor');
-    } catch (error) {
-        console.log(chalk.yellow('⚠️  Cursor not found. Please install Cursor or use the regular switch option.'));
-        console.log(chalk.gray('You can download Cursor from: https://cursor.sh/'));
-    }
-
-    // Show status
-    if (worktree.status.hasUncommittedChanges) {
-        console.log(chalk.yellow('\n⚠ This worktree has uncommitted changes.'));
-    }
-
-    if (worktree.status.ahead > 0 || worktree.status.behind > 0) {
-        console.log(chalk.gray(`\nBranch is ${worktree.status.ahead} commits ahead and ${worktree.status.behind} commits behind.`));
-    }
-}
-
-async function showWorktreeInfo(worktree: any) {
-    console.log(chalk.cyan.bold(`\n📋 Worktree Information: ${worktree.branch}`));
-    console.log(chalk.gray('─'.repeat(50)));
-
-    console.log(`${chalk.bold('Branch:')} ${worktree.branch}`);
-    console.log(`${chalk.bold('Path:')} ${worktree.path}`);
-    console.log(`${chalk.bold('Status:')} ${worktree.isCurrent ? chalk.green('● Current') : chalk.gray('○ Inactive')}`);
-
-    if (worktree.status.hasUncommittedChanges) {
-        console.log(`${chalk.bold('Changes:')} ${chalk.yellow('● Uncommitted changes')}`);
-    } else {
-        console.log(`${chalk.bold('Changes:')} ${chalk.green('● Clean working directory')}`);
-    }
-
-    console.log(`${chalk.bold('Last Commit:')} ${worktree.lastCommit.hash.substring(0, 8)} - ${worktree.lastCommit.message}`);
-    console.log(`${chalk.bold('Date:')} ${new Date(worktree.lastCommit.date).toLocaleString()}`);
-
-    if (worktree.status.ahead > 0 || worktree.status.behind > 0) {
-        console.log(`${chalk.bold('Sync:')} ${worktree.status.ahead} ahead, ${worktree.status.behind} behind`);
-    }
-
-    // Wait for user to press enter
-    await inquirer.prompt([
-        {
-            type: 'input',
-            name: 'continue',
-            message: 'Press Enter to continue...'
-        }
-    ]);
-}
-
-async function handleWorktreeDelete(worktree: any, git: any, manager: any) {
-    console.log(chalk.red(`\n🗑️  Delete Worktree: ${worktree.branch}`));
-
-    if (worktree.isCurrent) {
-        console.log(chalk.red('❌ Cannot delete the current worktree.'));
-        return;
-    }
-
-    if (worktree.status.hasUncommittedChanges) {
-        console.log(chalk.yellow('⚠️  This worktree has uncommitted changes that will be lost!'));
-    }
-
-    const { confirmDelete } = await inquirer.prompt([
-        {
-            type: 'confirm',
-            name: 'confirmDelete',
-            message: `Are you sure you want to delete "${worktree.branch}"?`,
-            default: false
-        }
-    ]);
-
-    if (confirmDelete) {
-        try {
-            await git.removeWorktree(worktree.path, false);
-            await manager.cleanWorktreeState(worktree.name);
-            console.log(chalk.green(`✓ Deleted worktree: ${worktree.branch}`));
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(chalk.red(`✗ Failed to delete worktree: ${errorMessage}`));
-        }
-    } else {
-        console.log(chalk.gray('Delete cancelled.'));
-    }
-}
 
 async function openInEditor(worktree: any) {
     console.log(chalk.cyan(`\n📂 Opening ${worktree.branch} in editor...`));

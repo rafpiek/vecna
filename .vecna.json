@@ -23,6 +23,12 @@
       "path": "/Users/rafalpiekara/dev/trees/feature-test-no-package-1753425190",
       "createdAt": "2025-07-25T06:33:10.991Z",
       "lastAccessedAt": "2025-07-25T06:33:10.991Z"
+    },
+    "feature-test-yarn-priority-1753425219": {
+      "branch": "feature/test-yarn-priority-1753425219",
+      "path": "/Users/rafalpiekara/dev/trees/feature-test-yarn-priority-1753425219",
+      "createdAt": "2025-07-25T06:33:39.469Z",
+      "lastAccessedAt": "2025-07-25T06:33:39.470Z"
     }
   }
 }
