@@ -155,6 +155,9 @@ async function showInteractiveWorktreeSelector(worktrees: any[], git: any, manag
     // Handle worktree switching
     if (selectedWorktree.isCurrent) {
         console.log(chalk.gray('Already in this worktree.'));
+        if (shouldOpenInEditor) {
+            await openInEditor(selectedWorktree);
+        }
         return;
     }
 
