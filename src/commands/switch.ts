@@ -11,6 +11,7 @@ import { spawn } from 'child_process';
 interface SwitchOptions {
     json?: boolean;
     editor?: boolean;
+    path?: boolean;
 }
 
 async function selectWorktreeForJson(worktrees: any[]): Promise<any> {
@@ -63,6 +64,22 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
             }
             console.log(chalk.yellow(`No worktrees found for project "${projectContext.name}".`));
             console.log(chalk.gray('Use "vecna start" to create one.'));
+            return;
+        }
+
+        // If path mode - output only path for command substitution
+        if (options.path) {
+            let selected;
+            if (worktrees.length === 1) {
+                selected = worktrees[0];
+            } else {
+                // Redirect prompts to stderr, output path to stdout
+                const originalWrite = process.stdout.write;
+                process.stdout.write = process.stderr.write.bind(process.stderr);
+                selected = await selectWorktreeForJson(worktrees);
+                process.stdout.write = originalWrite;
+            }
+            console.log(selected.path);
             return;
         }
 
@@ -198,15 +215,28 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
         }
     ]);
 
-    console.error(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
+    console.log(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
     
     // Optionally open in editor first
     if (shouldOpenInEditor) {
         await openInEditor(selectedWorktree);
     }
     
-    // Output ONLY the cd command to stdout - everything else goes to stderr
-    process.stdout.write(`cd "${selectedWorktree.path}"`);
+    console.log(chalk.green('✓') + ` Changed directory to: ${selectedWorktree.path}`);
+    console.log(chalk.yellow('Starting new shell in this directory...'));
+    
+    // Get user's shell from environment
+    const userShell = process.env.SHELL || '/bin/bash';
+    
+    // Spawn new shell in the target directory
+    const shellProcess = spawn(userShell, [], {
+        cwd: selectedWorktree.path,
+        stdio: 'inherit'
+    });
+    
+    shellProcess.on('exit', (code) => {
+        process.exit(code || 0);
+    });
 }
 
 
