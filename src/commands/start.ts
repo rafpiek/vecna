@@ -49,23 +49,34 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
         },
         {
             title: 'Pulling latest changes',
+            skip: async () => {
+                const hasRemotes = await git.hasRemotes();
+                const hasTracking = hasRemotes ? await git.hasTrackingBranch() : false;
+                if (!hasRemotes) {
+                    return 'No remotes configured - working locally';
+                }
+                if (!hasTracking) {
+                    return 'No tracking branch configured - working locally';
+                }
+                return false;
+            },
             task: async () => {
                 await git.pull();
             },
         },
         {
-            title: 'Creating branch if needed',
+            title: 'Checking branch availability',
             task: async () => {
-                const branchExists = await git.branchExists(branchName);
-                if (!branchExists) {
-                    await git.createBranch(branchName, fromBranch);
+                const branchInUse = await git.isBranchInUseByWorktree(branchName);
+                if (branchInUse.inUse) {
+                    throw new Error(`Branch '${branchName}' is already checked out in worktree: ${branchInUse.worktreePath}. Use 'vecna switch' to navigate there, or choose a different branch name.`);
                 }
             },
         },
         {
             title: 'Creating worktree',
             task: async (ctx) => {
-                await manager.create(branchName);
+                await manager.create(branchName, fromBranch);
                 ctx.worktreeCreated = true;
             },
         },

@@ -33,7 +33,7 @@ interface CreateOptions {
 }
 
 interface WorktreeManager {
-  create(branchName: string): Promise<void>;
+  create(branchName: string, fromBranch?: string): Promise<void>;
   createWorktree(branchName: string, options?: CreateOptions): Promise<WorktreeInfo>;
   listWorktrees(): Promise<WorktreeInfo[]>;
   removeWorktree(name: string, force?: boolean): Promise<void>;
@@ -51,7 +51,7 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
     const gitRepo = gitUtils(git);
     const config = configManager(fs);
 
-    const create = async (branchName: string): Promise<void> => {
+    const create = async (branchName: string, fromBranch: string = 'main'): Promise<void> => {
         const worktreeDir = path.join(homedir(), 'dev', 'trees');
         const worktreeName = branchName.replace(/\//g, '-');
         const worktreePath = path.join(worktreeDir, worktreeName);
@@ -63,7 +63,13 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
             throw new Error(`Worktree path already exists: ${worktreePath}`);
         }
 
-        await gitRepo.addWorktree(worktreePath, branchName);
+        // Check if branch exists, if not create it with the worktree
+        const branchExists = await gitRepo.branchExists(branchName);
+        if (branchExists) {
+            await gitRepo.addWorktree(worktreePath, branchName);
+        } else {
+            await gitRepo.addWorktreeWithNewBranch(worktreePath, branchName, fromBranch);
+        }
 
         // Save worktree state
         await saveWorktreeState({
@@ -183,12 +189,41 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         // Handle Procfile.dev port modification (from original WT script)
         await handleProcfilePortModification(targetPath);
 
-        // Detect package manager
+        // Check if package.json exists before attempting to install dependencies
+        const packageJsonPath = path.join(targetPath, 'package.json');
+        if (!(await fs.pathExists(packageJsonPath))) {
+            console.log('  No package.json found, skipping dependency installation');
+            
+            // Still run custom post-create scripts and auto-open
+            const postCreateScripts = localConfig?.worktrees?.postCreateScripts || [];
+            for (const script of postCreateScripts) {
+                console.log(`  Running: ${script}`);
+                const [command, ...args] = script.split(' ');
+                await execa(command, args, {
+                    cwd: targetPath,
+                    stdio: 'inherit'
+                });
+            }
+            
+            await handleAutoOpenInCursor(targetPath, localConfig);
+            return;
+        }
+
+        // Detect package manager - prioritize yarn, then pnpm, then npm
         let packageManager = 'npm';
         if (await fs.pathExists(path.join(targetPath, 'yarn.lock'))) {
             packageManager = 'yarn';
         } else if (await fs.pathExists(path.join(targetPath, 'pnpm-lock.yaml'))) {
             packageManager = 'pnpm';
+        } else {
+            // Check if yarn is available globally as preferred package manager
+            try {
+                await execa('yarn', ['--version'], { stdio: 'ignore' });
+                packageManager = 'yarn';
+            } catch {
+                // Fall back to npm if yarn is not available
+                packageManager = 'npm';
+            }
         }
 
         // Override with config if specified

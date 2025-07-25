@@ -4,5 +4,25 @@
     "js": "eslint"
   },
   "test": {},
-  "path": "/Users/rafalpiekara/dev/vecna"
+  "path": "/Users/rafalpiekara/dev/vecna",
+  "worktreeState": {
+    "feature-test-new-approach-1753424479": {
+      "branch": "feature/test-new-approach-1753424479",
+      "path": "/Users/rafalpiekara/dev/trees/feature-test-new-approach-1753424479",
+      "createdAt": "2025-07-25T06:21:19.855Z",
+      "lastAccessedAt": "2025-07-25T06:21:19.856Z"
+    },
+    "feature-test-package-fix-1753425167": {
+      "branch": "feature/test-package-fix-1753425167",
+      "path": "/Users/rafalpiekara/dev/trees/feature-test-package-fix-1753425167",
+      "createdAt": "2025-07-25T06:32:47.427Z",
+      "lastAccessedAt": "2025-07-25T06:32:47.427Z"
+    },
+    "feature-test-no-package-1753425190": {
+      "branch": "feature/test-no-package-1753425190",
+      "path": "/Users/rafalpiekara/dev/trees/feature-test-no-package-1753425190",
+      "createdAt": "2025-07-25T06:33:10.991Z",
+      "lastAccessedAt": "2025-07-25T06:33:10.991Z"
+    }
+  }
 }

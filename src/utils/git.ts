@@ -40,6 +40,9 @@ export const gitUtils = (git: SimpleGit) => ({
     addWorktree: async (path: string, branch: string): Promise<void> => {
         await git.raw('worktree', 'add', path, branch);
     },
+    addWorktreeWithNewBranch: async (path: string, branch: string, from: string = 'HEAD'): Promise<void> => {
+        await git.raw('worktree', 'add', '-b', branch, path, from);
+    },
     removeWorktree: async (path: string, force?: boolean): Promise<void> => {
         const args = ['worktree', 'remove'];
         if (force) {
@@ -166,5 +169,56 @@ export const gitUtils = (git: SimpleGit) => ({
     
     fetch: async (): Promise<void> => {
         await git.fetch();
+    },
+    
+    hasRemotes: async (): Promise<boolean> => {
+        try {
+            const remotes = await git.getRemotes();
+            return remotes.length > 0;
+        } catch {
+            return false;
+        }
+    },
+    
+    hasTrackingBranch: async (branch?: string): Promise<boolean> => {
+        try {
+            const currentBranch = branch || await git.revparse(['--abbrev-ref', 'HEAD']);
+            const trackingBranch = await git.revparse(['--abbrev-ref', `${currentBranch}@{upstream}`]);
+            return !!trackingBranch;
+        } catch {
+            return false;
+        }
+    },
+    
+    pullIfTracking: async (): Promise<boolean> => {
+        try {
+            const hasRemote = await gitUtils(git).hasRemotes();
+            if (!hasRemote) {
+                return false; // Skip pull if no remotes
+            }
+            
+            const hasTracking = await gitUtils(git).hasTrackingBranch();
+            if (!hasTracking) {
+                return false; // Skip pull if no tracking branch
+            }
+            
+            await git.pull();
+            return true; // Successfully pulled
+        } catch {
+            return false; // Failed to pull, but that's ok
+        }
+    },
+    
+    isBranchInUseByWorktree: async (branchName: string): Promise<{ inUse: boolean; worktreePath?: string }> => {
+        try {
+            const worktrees = await gitUtils(git).listWorktrees();
+            const inUseWorktree = worktrees.find(wt => wt.branch === branchName);
+            return {
+                inUse: !!inUseWorktree,
+                worktreePath: inUseWorktree?.path
+            };
+        } catch {
+            return { inUse: false };
+        }
     }
 });
