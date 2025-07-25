@@ -35,11 +35,13 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
             return;
         }
 
-        // Check if we should output shell commands for direct execution
-        const isShellMode = process.env.VECNA_SHELL_MODE === 'true';
-
         // Simple interactive selection
-        await showSimpleWorktreeSelector(worktrees, options.editor || false, isShellMode);
+        const selectedPath = await showSimpleWorktreeSelector(worktrees, options.editor || false);
+        
+        // If VECNA_OUTPUT_PATH is set, just output the path for shell integration
+        if (process.env.VECNA_OUTPUT_PATH === 'true') {
+            console.log(selectedPath);
+        }
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -52,18 +54,34 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
     }
 };
 
-async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: boolean = false, isShellMode: boolean = false) {
-    let selectedWorktree;
+async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: boolean = false): Promise<string> {
+    const isPathMode = process.env.VECNA_OUTPUT_PATH === 'true';
+    
+    if (!isPathMode) {
+        // Interactive mode with colors
+        console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
+    }
 
-    if (isShellMode) {
-        // In shell mode, use a simple numbered list without colors
-        process.stderr.write('Select Worktree:\n');
+    // Simple choices - just branch name and path
+    const choices: any[] = worktrees.map((wt) => {
+        const branchDisplay = wt.branch.length > 40 ? wt.branch.substring(0, 37) + '...' : wt.branch;
+        return {
+            name: isPathMode ? `${wt.branch} → ${wt.path}` : `${branchDisplay.padEnd(40)} ${chalk.gray('→')} ${wt.path}`,
+            value: wt,
+            short: wt.branch
+        };
+    });
+
+    let selectedWorktree;
+    
+    if (isPathMode) {
+        // In path mode, write to stderr and read from stdin
+        process.stderr.write('Choose worktree:\n');
         worktrees.forEach((wt, index) => {
             process.stderr.write(`${index + 1}. ${wt.branch} → ${wt.path}\n`);
         });
         process.stderr.write('Enter choice (1-' + worktrees.length + '): ');
-
-        // Read input synchronously
+        
         const choice = await new Promise<number>((resolve) => {
             process.stdin.once('data', (data) => {
                 const num = parseInt(data.toString().trim());
@@ -78,19 +96,6 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
 
         selectedWorktree = worktrees[choice - 1];
     } else {
-        // Normal interactive mode with colors
-        console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
-
-        // Simple choices - just branch name and path
-        const choices: any[] = worktrees.map((wt) => {
-            const branchDisplay = wt.branch.length > 40 ? wt.branch.substring(0, 37) + '...' : wt.branch;
-            return {
-                name: `${branchDisplay.padEnd(40)} ${chalk.gray('→')} ${wt.path}`,
-                value: wt,
-                short: wt.branch
-            };
-        });
-
         const result = await inquirer.prompt([
             {
                 type: 'list',
@@ -104,56 +109,33 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
         selectedWorktree = result.selectedWorktree;
     }
 
-    if (isShellMode) {
-        // In shell mode, output commands for the shell function to execute
-        console.log(`cd "${selectedWorktree.path}"`);
-        if (shouldOpenInEditor) {
-            // Try to open editor
-            const editors = ['code', 'cursor', 'subl'];
-            for (const editor of editors) {
-                try {
-                    await new Promise((resolve, reject) => {
-                        const proc = spawn('which', [editor], { stdio: 'ignore' });
-                        proc.on('close', (code) => {
-                            if (code === 0) resolve(editor);
-                            else reject();
-                        });
-                    });
-                    console.log(`${editor} "${selectedWorktree.path}" &`);
-                    break;
-                } catch {
-                    // Try next editor
-                }
-            }
-        }
-    } else {
-        // Normal mode - show instructions
-        console.log(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
-        
-        // Copy the path to clipboard for easy pasting
-        let clipboardSuccess = false;
-        try {
-            const clipboard = await import('clipboardy');
-            await clipboard.default.write(`cd ${selectedWorktree.path}`);
-            clipboardSuccess = true;
-        } catch (error) {
-            // Clipboard functionality is optional
-        }
-
-        console.log(chalk.green('✓') + ' To navigate, run:');
-        console.log(chalk.yellow(`  cd ${selectedWorktree.path}`));
-        if (clipboardSuccess) {
-            console.log(chalk.gray('\n(Command copied to clipboard)'));
-        }
-        
-        console.log(chalk.gray('\nTip: For automatic navigation, add this to your shell:'));
-        console.log(chalk.blue('  vecna() { eval "$(VECNA_SHELL_MODE=true command vecna "$@")"; }'));
-
-        // Optionally open in editor
-        if (shouldOpenInEditor) {
-            await openInEditor(selectedWorktree);
-        }
+    if (isPathMode) {
+        // In path mode, just return the path
+        return selectedWorktree.path;
     }
+
+    // Normal mode - show user-friendly output and copy to clipboard
+    console.log(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
+    
+    try {
+        const clipboard = await import('clipboardy');
+        await clipboard.default.write(`cd "${selectedWorktree.path}"`);
+    } catch {
+        // Clipboard is optional
+    }
+    
+    console.log(chalk.green('✓') + ' Path copied to clipboard!');
+    console.log(chalk.yellow('\nTo navigate:'));
+    console.log(chalk.bold(`cd "${selectedWorktree.path}"`));
+    console.log(chalk.gray('\nTip: For zero-config navigation, add this alias:'));
+    console.log(chalk.blue(`alias vs='cd "$(VECNA_OUTPUT_PATH=true vecna switch)"'`));
+    
+    // Optionally open in editor
+    if (shouldOpenInEditor) {
+        await openInEditor(selectedWorktree);
+    }
+    
+    return selectedWorktree.path;
 }
 
 
