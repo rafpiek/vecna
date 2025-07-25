@@ -44,6 +44,10 @@ export interface ProjectConfig {
 
 export interface GlobalConfig {
     projects: ProjectConfig[];
+    defaultProject?: {
+        name: string;
+        path: string;
+    };
 }
 
 export function configManager(fs: any) {
@@ -59,6 +63,10 @@ export function configManager(fs: any) {
         readGlobalConfig: async (): Promise<GlobalConfig> => {
             await configManager(fs).ensureGlobalConfig();
             return await fs.readJson(GLOBAL_CONFIG_PATH);
+        },
+
+        writeGlobalConfig: async (config: GlobalConfig): Promise<void> => {
+            await fs.writeJson(GLOBAL_CONFIG_PATH, config, { spaces: 2 });
         },
 
         updateGlobalConfig: async (projectConfig: ProjectConfig): Promise<void> => {

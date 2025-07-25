@@ -6,7 +6,6 @@ import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
 // Dynamic import for clipboardy ESM module
-import { spawn } from 'child_process';
 
 interface SwitchOptions {
     json?: boolean;
@@ -205,22 +204,8 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
         await openInEditor(selectedWorktree);
     }
     
-    // DIRECT NAVIGATION - NO BULLSHIT
+    // Change to the directory
     process.chdir(selectedWorktree.path);
-    
-    // Get user's shell
-    const userShell = process.env.SHELL || '/bin/bash';
-    
-    // Replace the current process with a new shell in the target directory
-    const shellProcess = spawn(userShell, [], {
-        cwd: selectedWorktree.path,
-        stdio: 'inherit'
-    });
-    
-    shellProcess.on('exit', (code) => {
-        process.exit(code || 0);
-    });
-    
     console.log(chalk.green('✓') + ` Changed directory to: ${selectedWorktree.path}`);
 }
 

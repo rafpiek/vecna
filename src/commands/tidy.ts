@@ -35,8 +35,12 @@ export default async (gitInstance: SimpleGit, options: TidyOptions = {}) => {
     const manager = worktreeManager(gitInstance);
 
     try {
-        // 1. Ensure we're in project root
-        await ensureInProjectRoot(git, config);
+        // 1. Determine project context and ensure we're in project root
+        const projectContext = await getProjectContext(git, config);
+        if (!projectContext) {
+            throw new Error('No project context found. Run "vecna setup" in a project directory or set a default project with "vecna default -p".');
+        }
+        await ensureInProjectRoot(git, config, projectContext);
         
         // 2. Switch to main branch and update
         await prepareMainBranch(git, config);
@@ -68,21 +72,43 @@ export default async (gitInstance: SimpleGit, options: TidyOptions = {}) => {
     }
 };
 
-async function ensureInProjectRoot(git: any, config: any): Promise<void> {
-    // Get project config to find the root directory
-    const projectConfig = await config.readLocalConfig();
+async function getProjectContext(git: any, config: any) {
+    // Check if we're in a directory with .vecna.json (local project)
+    const currentDir = process.cwd();
+    const vecnaConfigPath = path.join(currentDir, '.vecna.json');
     
-    if (!projectConfig) {
-        throw new Error('No .vecna.json found. Run "vecna setup" first from your project root.');
+    if (await fs.pathExists(vecnaConfigPath)) {
+        const localConfig = await fs.readJson(vecnaConfigPath);
+        return {
+            name: localConfig.name,
+            path: currentDir,
+            isLocal: true
+        };
     }
-    
+
+    // Check for default project in global config
+    const globalConfig = await config.readGlobalConfig();
+    if (globalConfig?.defaultProject) {
+        return {
+            name: globalConfig.defaultProject.name,
+            path: globalConfig.defaultProject.path,
+            isDefault: true
+        };
+    }
+
+    return null;
+}
+
+async function ensureInProjectRoot(git: any, config: any, projectContext: any): Promise<void> {
     // Ensure we're in the project root directory
     const currentDir = process.cwd();
-    const projectRoot = projectConfig.path;
+    const projectRoot = projectContext.path;
     
     if (path.resolve(currentDir) !== path.resolve(projectRoot)) {
         console.log(chalk.yellow(`Switching to project root: ${projectRoot}`));
         process.chdir(projectRoot);
+        // Re-initialize git instance in the new directory
+        git.cwd(projectRoot);
     }
     
     // Verify this is still the main repository

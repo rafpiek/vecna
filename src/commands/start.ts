@@ -6,6 +6,8 @@ import { SimpleGit } from 'simple-git';
 import chalk from 'chalk';
 import path from 'path';
 import { homedir } from 'os';
+import fs from 'fs-extra';
+import { configManager } from '../utils/configManager';
 
 interface StartOptions {
     branch?: string;
@@ -16,6 +18,20 @@ interface StartOptions {
 export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
     const git = gitUtils(gitInstance);
     const manager = worktreeManager(gitInstance);
+    const config = configManager(fs);
+    
+    // Determine project context
+    const projectContext = await getProjectContext(gitInstance, config);
+    if (!projectContext) {
+        throw new Error('No project context found. Run "vecna setup" in a project directory or set a default project with "vecna default -p".');
+    }
+    
+    // Switch to project directory if needed
+    if (process.cwd() !== projectContext.path) {
+        console.log(chalk.yellow(`Switching to project: ${projectContext.name}`));
+        process.chdir(projectContext.path);
+        gitInstance.cwd(projectContext.path);
+    }
 
     // Get branch name from options or prompt
     const branchName = options.branch || await getBranchName();
@@ -109,6 +125,33 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
         process.exit(1);
     }
 };
+
+async function getProjectContext(gitInstance: SimpleGit, config: any) {
+    // Check if we're in a directory with .vecna.json (local project)
+    const currentDir = process.cwd();
+    const vecnaConfigPath = path.join(currentDir, '.vecna.json');
+    
+    if (await fs.pathExists(vecnaConfigPath)) {
+        const localConfig = await fs.readJson(vecnaConfigPath);
+        return {
+            name: localConfig.name,
+            path: currentDir,
+            isLocal: true
+        };
+    }
+
+    // Check for default project in global config
+    const globalConfig = await config.readGlobalConfig();
+    if (globalConfig?.defaultProject) {
+        return {
+            name: globalConfig.defaultProject.name,
+            path: globalConfig.defaultProject.path,
+            isDefault: true
+        };
+    }
+
+    return null;
+}
 
 async function getBranchName(): Promise<string> {
     const clipboard = await import('clipboardy');

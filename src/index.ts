@@ -56,6 +56,13 @@ program
     .description('list all projects')
     .action(() => import('./commands/list').then(i => i.default(config)));
 
+program
+    .command('default')
+    .description('Manage default project')
+    .option('-p, --project', 'Show project picker to set default')
+    .option('--clear', 'Clear default project')
+    .action((options) => import('./commands/default').then(i => i.default(config, options)));
+
 // Lint command with subcommands
 const lintCommand = program
     .command('lint')
