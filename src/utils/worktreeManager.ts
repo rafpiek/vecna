@@ -162,6 +162,7 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
 
         // Default files to copy
         const defaultFiles = [
+            '.vecna.json',
             'config/master.key',
             'config/application.yml',
             '.env',
@@ -193,7 +194,7 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         const packageJsonPath = path.join(targetPath, 'package.json');
         if (!(await fs.pathExists(packageJsonPath))) {
             console.log('  No package.json found, skipping dependency installation');
-            
+
             // Still run custom post-create scripts and auto-open
             const postCreateScripts = localConfig?.worktrees?.postCreateScripts || [];
             for (const script of postCreateScripts) {
@@ -204,7 +205,7 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
                     stdio: 'inherit'
                 });
             }
-            
+
             await handleAutoOpenInCursor(targetPath, localConfig);
             return;
         }
@@ -255,7 +256,7 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
 
     const handleAutoOpenInCursor = async (targetPath: string, localConfig: any): Promise<void> => {
         const editorConfig = localConfig?.worktrees?.editor;
-        
+
         // Check if auto-open is enabled and Cursor is preferred
         if (editorConfig?.openOnSwitch && (editorConfig?.preferCursor || editorConfig?.command === 'cursor')) {
             try {
