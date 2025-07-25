@@ -6,6 +6,7 @@ import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
 // Dynamic import for clipboardy ESM module
+import { spawn } from 'child_process';
 
 interface SwitchOptions {
     json?: boolean;
@@ -173,8 +174,8 @@ async function showProjectPicker(config: any, options: SwitchOptions) {
 }
 
 async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: boolean = false, projectContext?: any): Promise<void> {
-    // Interactive mode with colors
-    console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
+    // Interactive mode with colors - output to stderr so stdout is clean for command substitution
+    console.error(chalk.cyan.bold('🌳 Select Worktree\n'));
 
     // Simple choices - just branch name and path
     const choices: any[] = worktrees.map((wt) => {
@@ -197,16 +198,15 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
         }
     ]);
 
-    console.log(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
+    console.error(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
     
     // Optionally open in editor first
     if (shouldOpenInEditor) {
         await openInEditor(selectedWorktree);
     }
     
-    // Change to the directory
-    process.chdir(selectedWorktree.path);
-    console.log(chalk.green('✓') + ` Changed directory to: ${selectedWorktree.path}`);
+    // Output ONLY the cd command to stdout - everything else goes to stderr
+    process.stdout.write(`cd "${selectedWorktree.path}"`);
 }
 
 
