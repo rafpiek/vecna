@@ -63,6 +63,11 @@ program
     .option('--clear', 'Clear default project')
     .action((options) => import('./commands/default').then(i => i.default(config, options)));
 
+program
+    .command('reset')
+    .description('Reset global configuration (removes all project settings)')
+    .action(() => import('./commands/reset').then(i => i.default(config)));
+
 // Lint command with subcommands
 const lintCommand = program
     .command('lint')
