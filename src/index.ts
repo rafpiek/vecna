@@ -29,6 +29,7 @@ program
     .option('-b, --branch <name>', 'Specify branch name directly')
     .option('--no-install', 'Skip dependency installation')
     .option('--from <branch>', 'Create worktree from specific branch (default: main)')
+    .option('-e, --editor', 'Open new worktree in editor (Cursor)')
     .action((options) => import('./commands/start').then(i => i.default(gitInstance, options)));
 
 program

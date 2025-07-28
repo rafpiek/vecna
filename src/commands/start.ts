@@ -8,11 +8,52 @@ import path from 'path';
 import { homedir } from 'os';
 import fs from 'fs-extra';
 import { configManager } from '../utils/configManager';
+import { spawn } from 'child_process';
+
+async function copyToClipboard(text: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let command: string;
+        let args: string[];
+
+        // Determine the platform-specific clipboard command
+        if (process.platform === 'darwin') {
+            command = 'pbcopy';
+            args = [];
+        } else if (process.platform === 'linux') {
+            command = 'xclip';
+            args = ['-selection', 'clipboard'];
+        } else if (process.platform === 'win32') {
+            command = 'clip';
+            args = [];
+        } else {
+            reject(new Error(`Unsupported platform: ${process.platform}`));
+            return;
+        }
+
+        const proc = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+        
+        proc.stdin.write(text);
+        proc.stdin.end();
+
+        proc.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Clipboard command failed with code ${code}`));
+            }
+        });
+
+        proc.on('error', (error) => {
+            reject(error);
+        });
+    });
+}
 
 interface StartOptions {
     branch?: string;
     install?: boolean;
     from?: string;
+    editor?: boolean;
 }
 
 export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
@@ -116,8 +157,23 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
 
         console.log('\n' + chalk.green('✓') + ' Worktree created successfully!');
         console.log('\nLocation: ' + chalk.cyan(ctx.worktreePath));
-        console.log('\nTo navigate to your worktree:');
-        console.log(chalk.yellow(`  cd ${ctx.worktreePath}`));
+        
+        // Copy cd command to clipboard
+        const cdCommand = `cd "${ctx.worktreePath}"`;
+        try {
+            await copyToClipboard(cdCommand);
+            console.log('\n' + chalk.green('✓') + ` Copied to clipboard: ${chalk.cyan(cdCommand)}`);
+            console.log(chalk.gray('Just paste and press Enter to navigate!'));
+        } catch (error) {
+            console.log('\n' + chalk.yellow('⚠️  Could not copy to clipboard'));
+            console.log('To navigate to your worktree:');
+            console.log(chalk.yellow(`  cd ${ctx.worktreePath}`));
+        }
+
+        // Optionally open in editor
+        if (options.editor) {
+            await openInEditor(ctx.worktreePath, ctx.branchName);
+        }
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -154,9 +210,6 @@ async function getProjectContext(gitInstance: SimpleGit, config: any) {
 }
 
 async function getBranchName(): Promise<string> {
-    const clipboard = await import('clipboardy');
-    const clipboardContent = await clipboard.default.read().catch(() => '');
-
     const tasks = new Listr([
         {
             title: 'Enter branch name',
@@ -164,7 +217,6 @@ async function getBranchName(): Promise<string> {
                 const branchName = await task.prompt({
                     type: 'input',
                     message: 'Enter branch name:',
-                    initial: clipboardContent,
                 });
 
                 if (!branchName) {
@@ -178,4 +230,29 @@ async function getBranchName(): Promise<string> {
 
     const { branchName } = await tasks.run();
     return branchName;
+}
+
+async function openInEditor(worktreePath: string, branchName: string) {
+    console.log(chalk.cyan(`\n📂 Opening ${branchName} in cursor...`));
+
+    try {
+        // Check if cursor is available
+        await new Promise((resolve, reject) => {
+            const proc = spawn('which', ['cursor'], { stdio: 'ignore' });
+            proc.on('close', (code: number | null) => {
+                if (code === 0) resolve('cursor');
+                else reject();
+            });
+        });
+
+        // Open in cursor
+        spawn('cursor', [worktreePath], {
+            detached: true,
+            stdio: 'ignore'
+        }).unref();
+        console.log(chalk.green(`✓ Opened in cursor`));
+    } catch (error) {
+        console.log(chalk.yellow('⚠️  Cursor not found. Install cursor or manually open:'));
+        console.log(chalk.gray(`cursor "${worktreePath}"`));
+    }
 }

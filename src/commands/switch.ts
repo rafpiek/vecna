@@ -5,8 +5,46 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
-// Dynamic import for clipboardy ESM module
 import { spawn } from 'child_process';
+
+async function copyToClipboard(text: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let command: string;
+        let args: string[];
+
+        // Determine the platform-specific clipboard command
+        if (process.platform === 'darwin') {
+            command = 'pbcopy';
+            args = [];
+        } else if (process.platform === 'linux') {
+            command = 'xclip';
+            args = ['-selection', 'clipboard'];
+        } else if (process.platform === 'win32') {
+            command = 'clip';
+            args = [];
+        } else {
+            reject(new Error(`Unsupported platform: ${process.platform}`));
+            return;
+        }
+
+        const proc = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+        
+        proc.stdin.write(text);
+        proc.stdin.end();
+
+        proc.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Clipboard command failed with code ${code}`));
+            }
+        });
+
+        proc.on('error', (error) => {
+            reject(error);
+        });
+    });
+}
 
 interface SwitchOptions {
     json?: boolean;
@@ -40,11 +78,11 @@ async function selectWorktreeForJson(worktrees: any[]): Promise<any> {
 
 export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
     const config = configManager(fs);
-    
+
     try {
         // Determine project context
         const projectContext = await getProjectContext(gitInstance, config);
-        
+
         if (!projectContext) {
             // No project context, show project picker
             await showProjectPicker(config, options);
@@ -53,7 +91,7 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
 
         // Create git instance for the project
         const projectGit = gitUtils(gitInstance.cwd(projectContext.path));
-        
+
         // Get basic worktree list (just paths and branches)
         const worktrees = await projectGit.listWorktrees();
 
@@ -119,7 +157,7 @@ async function getProjectContext(gitInstance: SimpleGit, config: any) {
     // Check if we're in a directory with .vecna.json (local project)
     const currentDir = process.cwd();
     const vecnaConfigPath = path.join(currentDir, '.vecna.json');
-    
+
     if (await fs.pathExists(vecnaConfigPath)) {
         const localConfig = await fs.readJson(vecnaConfigPath);
         return {
@@ -148,11 +186,19 @@ async function showProjectPicker(config: any, options: SwitchOptions) {
     const projectList = projects;
 
     if (projectList.length === 0) {
-        console.log(chalk.yellow('No projects found.'));
-        console.log(chalk.gray('Use "vecna setup" in a project directory to add projects.'));
-        console.log(chalk.gray('Or set a default project with "vecna default -p".'));
+        if (options.json) {
+            console.log(JSON.stringify({ error: 'No projects found' }));
+            process.exit(1);
+        }
+        console.error(chalk.yellow('No projects found.'));
+        console.error(chalk.gray('Use "vecna setup" in a project directory to add projects.'));
+        console.error(chalk.gray('Or set a default project with "vecna default -p".'));
         return;
     }
+
+    // Redirect all interactive output to stderr to keep stdout clean for shell integration
+    const originalStdoutWrite = process.stdout.write;
+    process.stdout.write = process.stderr.write.bind(process.stderr);
 
     console.log(chalk.cyan.bold('🌟 Select Project to Switch Worktrees\n'));
 
@@ -175,15 +221,22 @@ async function showProjectPicker(config: any, options: SwitchOptions) {
 
     console.log(chalk.gray(`\nTip: Set "${selectedProject.name}" as default with: vecna default -p\n`));
 
+    // Restore stdout before proceeding
+    process.stdout.write = originalStdoutWrite;
+
     // Now get worktrees for the selected project and continue
     const SimpleGit = (await import('simple-git')).default;
     const projectGit = gitUtils(SimpleGit().cwd(selectedProject.path));
-    
+
     const worktrees = await projectGit.listWorktrees();
 
     if (worktrees.length === 0) {
-        console.log(chalk.yellow(`No worktrees found for project "${selectedProject.name}".`));
-        console.log(chalk.gray('Use "vecna start" to create one.'));
+        if (options.json) {
+            console.log(JSON.stringify({ error: `No worktrees found for project "${selectedProject.name}"` }));
+            process.exit(1);
+        }
+        console.error(chalk.yellow(`No worktrees found for project "${selectedProject.name}".`));
+        console.error(chalk.gray('Use "vecna start" to create one.'));
         return;
     }
 
@@ -191,8 +244,11 @@ async function showProjectPicker(config: any, options: SwitchOptions) {
 }
 
 async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: boolean = false, projectContext?: any): Promise<void> {
-    // Interactive mode with colors - output to stderr so stdout is clean for command substitution
-    console.error(chalk.cyan.bold('🌳 Select Worktree\n'));
+    // Redirect all interactive output to stderr to keep stdout clean for shell integration
+    const originalStdoutWrite = process.stdout.write;
+    process.stdout.write = process.stderr.write.bind(process.stderr);
+
+    console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
 
     // Simple choices - just branch name and path
     const choices: any[] = worktrees.map((wt) => {
@@ -215,67 +271,50 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
         }
     ]);
 
-    console.log(chalk.cyan(`\nNavigating to ${selectedWorktree.branch}...`));
-    
-    // Optionally open in editor first
+    // Copy cd command to clipboard
+    const cdCommand = `cd "${selectedWorktree.path}"`;
+    try {
+        await copyToClipboard(cdCommand);
+        console.log(chalk.green('✓') + ` Copied to clipboard: ${chalk.cyan(cdCommand)}`);
+        console.log(chalk.gray('Just paste and press Enter to navigate!'));
+    } catch (error) {
+        console.log(chalk.yellow('⚠️  Could not copy to clipboard:'), error instanceof Error ? error.message : String(error));
+        console.log(chalk.gray(`Run: ${cdCommand}`));
+    }
+
+    // Optionally open in editor
     if (shouldOpenInEditor) {
         await openInEditor(selectedWorktree);
     }
-    
-    console.log(chalk.green('✓') + ` Changed directory to: ${selectedWorktree.path}`);
-    console.log(chalk.yellow('Starting new shell in this directory...'));
-    
-    // Get user's shell from environment
-    const userShell = process.env.SHELL || '/bin/bash';
-    
-    // Spawn new shell in the target directory
-    const shellProcess = spawn(userShell, [], {
-        cwd: selectedWorktree.path,
-        stdio: 'inherit'
-    });
-    
-    shellProcess.on('exit', (code) => {
-        process.exit(code || 0);
-    });
+
+    // Restore stdout
+    process.stdout.write = originalStdoutWrite;
 }
 
 
 async function openInEditor(worktree: any) {
-    console.log(chalk.cyan(`\n📂 Opening ${worktree.branch} in editor...`));
+    console.log(chalk.cyan(`\n📂 Opening ${worktree.branch} in cursor...`));
 
-    // Try to detect the editor
-    const editors = ['code', 'cursor', 'subl', 'atom', 'vim'];
-    let editor = null;
-
-    for (const ed of editors) {
-        try {
-            // Check if editor is available
-            await new Promise((resolve, reject) => {
-                const proc = spawn('which', [ed], { stdio: 'ignore' });
-                proc.on('close', (code) => {
-                    if (code === 0) resolve(ed);
-                    else reject();
-                });
+    try {
+        // Check if cursor is available
+        await new Promise((resolve, reject) => {
+            const { spawn } = require('child_process');
+            const proc = spawn('which', ['cursor'], { stdio: 'ignore' });
+            proc.on('close', (code: number | null) => {
+                if (code === 0) resolve('cursor');
+                else reject();
             });
-            editor = ed;
-            break;
-        } catch {
-            // Editor not found, try next
-        }
-    }
+        });
 
-    if (editor) {
-        try {
-            spawn(editor, [worktree.path], {
-                detached: true,
-                stdio: 'ignore'
-            }).unref();
-            console.log(chalk.green(`✓ Opened in ${editor}`));
-        } catch (error) {
-            console.error(chalk.red(`✗ Failed to open in ${editor}`));
-        }
-    } else {
-        console.log(chalk.yellow('⚠️  No supported editor found. Supported editors: code, cursor, subl, atom, vim'));
-        console.log(chalk.gray(`You can manually open: ${worktree.path}`));
+        // Open in cursor
+        const { spawn } = require('child_process');
+        spawn('cursor', [worktree.path], {
+            detached: true,
+            stdio: 'ignore'
+        }).unref();
+        console.log(chalk.green(`✓ Opened in cursor`));
+    } catch (error) {
+        console.log(chalk.yellow('⚠️  Cursor not found. Install cursor or manually open:'));
+        console.log(chalk.gray(`cursor "${worktree.path}"`));
     }
 }
