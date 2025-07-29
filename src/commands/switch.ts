@@ -102,15 +102,31 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
         const projectGit = gitUtils(gitInstance.cwd(projectContext.path));
 
         // Get basic worktree list (just paths and branches)
-        const worktrees = await projectGit.listWorktrees();
-
-        if (worktrees.length === 0) {
+        const allWorktrees = await projectGit.listWorktrees();
+        
+        if (allWorktrees.length === 0) {
             if (options.json) {
                 console.log(JSON.stringify({ error: 'No worktrees found' }));
                 process.exit(1);
             }
             console.log(chalk.yellow(`No worktrees found for project "${projectContext.name}".`));
             console.log(chalk.gray('Use "vecna start" to create one.'));
+            return;
+        }
+
+        // Filter out main repo directory - just remove "chatchat" for now
+        const worktrees = allWorktrees.filter(wt => {
+            const dirName = path.basename(wt.path);
+            return dirName !== 'chatchat';
+        });
+
+        if (worktrees.length === 0) {
+            if (options.json) {
+                console.log(JSON.stringify({ error: 'No other worktrees found' }));
+                process.exit(1);
+            }
+            console.log(chalk.yellow(`No other worktrees found for project "${projectContext.name}".`));
+            console.log(chalk.gray('Use "vecna start" to create more worktrees.'));
             return;
         }
 
@@ -237,15 +253,31 @@ async function showProjectPicker(config: any, options: SwitchOptions) {
     const SimpleGit = (await import('simple-git')).default;
     const projectGit = gitUtils(SimpleGit().cwd(selectedProject.path));
 
-    const worktrees = await projectGit.listWorktrees();
-
-    if (worktrees.length === 0) {
+    const allWorktrees = await projectGit.listWorktrees();
+    
+    if (allWorktrees.length === 0) {
         if (options.json) {
             console.log(JSON.stringify({ error: `No worktrees found for project "${selectedProject.name}"` }));
             process.exit(1);
         }
         console.error(chalk.yellow(`No worktrees found for project "${selectedProject.name}".`));
         console.error(chalk.gray('Use "vecna start" to create one.'));
+        return;
+    }
+
+    // Filter out main repo directory - just remove "chatchat" for now
+    const worktrees = allWorktrees.filter(wt => {
+        const dirName = path.basename(wt.path);
+        return dirName !== 'chatchat';
+    });
+
+    if (worktrees.length === 0) {
+        if (options.json) {
+            console.log(JSON.stringify({ error: `No other worktrees found for project "${selectedProject.name}"` }));
+            process.exit(1);
+        }
+        console.error(chalk.yellow(`No other worktrees found for project "${selectedProject.name}".`));
+        console.error(chalk.gray('Use "vecna start" to create more worktrees.'));
         return;
     }
 

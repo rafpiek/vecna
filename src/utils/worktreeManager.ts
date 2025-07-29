@@ -187,8 +187,7 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
     const runPostCreateScripts = async (targetPath: string): Promise<void> => {
         const localConfig = await config.readLocalConfig();
 
-        // Handle Procfile.dev port modification (from original WT script)
-        await handleProcfilePortModification(targetPath);
+        // Procfile.dev port modification removed - no longer needed
 
         // Check if package.json exists before attempting to install dependencies
         const packageJsonPath = path.join(targetPath, 'package.json');
@@ -282,48 +281,6 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         }
     };
 
-    const handleProcfilePortModification = async (targetPath: string): Promise<void> => {
-        const procfilePath = path.join(targetPath, 'Procfile.dev');
-
-        if (await fs.pathExists(procfilePath)) {
-            try {
-                const procfileContent = await fs.readFile(procfilePath, 'utf-8');
-
-                // Check if -p 3000 exists in the file
-                if (procfileContent.includes('-p 3000')) {
-                    // Find an available port between 3001 and 4000
-                    let newPort = null;
-
-                    for (let port = 3001; port <= 4000; port++) {
-                        if (await isPortAvailable(port)) {
-                            newPort = port;
-                            break;
-                        }
-                    }
-
-                    if (newPort) {
-                        const updatedContent = procfileContent.replace(/-p 3000/g, `-p ${newPort}`);
-                        await fs.writeFile(procfilePath, updatedContent);
-                        console.log(`  Updated Procfile.dev port from 3000 to ${newPort}`);
-                    } else {
-                        console.log('  Procfile.dev found but couldn\'t find available port between 3001-4000');
-                    }
-                }
-            } catch (error) {
-                console.log('  Warning: Could not modify Procfile.dev port');
-            }
-        }
-    };
-
-    const isPortAvailable = async (port: number): Promise<boolean> => {
-        try {
-            // Use lsof to check if port is in use (Unix/macOS)
-            await execa('lsof', ['-i', `:${port}`], { stdio: 'ignore' });
-            return false; // Port is in use
-        } catch {
-            return true; // Port is available (lsof returned non-zero exit code)
-        }
-    };
 
     const saveWorktreeState = async (info: WorktreeInfo): Promise<void> => {
         await config.updateWorktreeState(info.name, {
