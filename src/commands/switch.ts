@@ -55,9 +55,8 @@ interface SwitchOptions {
 async function selectWorktreeForJson(worktrees: any[]): Promise<any> {
     const choices: any[] = worktrees.map((wt) => {
         const dirName = path.basename(wt.path);
-        const displayName = dirName.length > 60 ? dirName.substring(0, 57) + '...' : dirName;
         return {
-            name: displayName,
+            name: dirName,
             value: wt,
             short: dirName
         };
@@ -254,9 +253,8 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
     // Simple choices - just directory name from path
     const choices: any[] = worktrees.map((wt) => {
         const dirName = path.basename(wt.path);
-        const displayName = dirName.length > 60 ? dirName.substring(0, 57) + '...' : dirName;
         return {
-            name: displayName,
+            name: dirName,
             value: wt,
             short: dirName
         };
