@@ -2,7 +2,6 @@ import { SimpleGit } from 'simple-git';
 import { gitUtils } from '../utils/git';
 import { configManager } from '../utils/configManager';
 import inquirer from 'inquirer';
-import { search } from '@inquirer/prompts';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
@@ -53,36 +52,28 @@ interface SwitchOptions {
     path?: boolean;
 }
 
-async function selectWorktreeWithFuzzySearch(worktrees: any[]): Promise<any> {
-    const choices = worktrees.map((wt) => {
+async function selectWorktreeForJson(worktrees: any[]): Promise<any> {
+    const choices: any[] = worktrees.map((wt) => {
         const dirName = path.basename(wt.path);
         return {
             name: dirName,
-            value: wt
+            value: wt,
+            short: dirName
         };
     });
 
-    const selected = await search({
-        message: 'Choose worktree to navigate to:',
-        source: async (input) => {
-            if (!input) {
-                return choices;
-            }
-            
-            // Simple fuzzy matching - case insensitive substring search
-            const filtered = choices.filter(choice => 
-                choice.name.toLowerCase().includes(input.toLowerCase())
-            );
-            
-            return filtered;
+    const { selectedWorktree } = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'selectedWorktree',
+            message: 'Choose worktree to navigate to:',
+            choices,
+            pageSize: Math.min(15, choices.length),
+            loop: false
         }
-    });
+    ]);
 
-    return selected;
-}
-
-async function selectWorktreeForJson(worktrees: any[]): Promise<any> {
-    return await selectWorktreeWithFuzzySearch(worktrees);
+    return selectedWorktree;
 }
 
 export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
@@ -101,9 +92,8 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
         // Create git instance for the project
         const projectGit = gitUtils(gitInstance.cwd(projectContext.path));
 
-        // Get basic worktree list (just paths and branches), excluding main worktree
-        const allWorktrees = await projectGit.listWorktrees();
-        const worktrees = allWorktrees.filter(wt => !wt.isCurrent && wt.branch !== 'main');
+        // Get basic worktree list (just paths and branches)
+        const worktrees = await projectGit.listWorktrees();
 
         if (worktrees.length === 0) {
             if (options.json) {
@@ -238,8 +228,7 @@ async function showProjectPicker(config: any, options: SwitchOptions) {
     const SimpleGit = (await import('simple-git')).default;
     const projectGit = gitUtils(SimpleGit().cwd(selectedProject.path));
 
-    const allWorktrees = await projectGit.listWorktrees();
-    const worktrees = allWorktrees.filter(wt => !wt.isCurrent && wt.branch !== 'main');
+    const worktrees = await projectGit.listWorktrees();
 
     if (worktrees.length === 0) {
         if (options.json) {
@@ -261,7 +250,26 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
 
     console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
 
-    const selectedWorktree = await selectWorktreeWithFuzzySearch(worktrees);
+    // Simple choices - just directory name from path
+    const choices: any[] = worktrees.map((wt) => {
+        const dirName = path.basename(wt.path);
+        return {
+            name: dirName,
+            value: wt,
+            short: dirName
+        };
+    });
+
+    const { selectedWorktree } = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'selectedWorktree',
+            message: 'Choose worktree to navigate to:',
+            choices,
+            pageSize: Math.min(15, choices.length),
+            loop: false
+        }
+    ]);
 
     // Copy cd command to clipboard
     const cdCommand = `cd "${selectedWorktree.path}"`;
