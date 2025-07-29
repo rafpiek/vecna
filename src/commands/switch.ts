@@ -54,11 +54,12 @@ interface SwitchOptions {
 
 async function selectWorktreeForJson(worktrees: any[]): Promise<any> {
     const choices: any[] = worktrees.map((wt) => {
-        const branchDisplay = wt.branch.length > 40 ? wt.branch.substring(0, 37) + '...' : wt.branch;
+        const dirName = path.basename(wt.path);
+        const displayName = dirName.length > 60 ? dirName.substring(0, 57) + '...' : dirName;
         return {
-            name: `${branchDisplay.padEnd(40)} ${chalk.gray('→')} ${wt.path}`,
+            name: displayName,
             value: wt,
-            short: wt.branch
+            short: dirName
         };
     });
 
@@ -250,13 +251,14 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
 
     console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
 
-    // Simple choices - just branch name and path
+    // Simple choices - just directory name from path
     const choices: any[] = worktrees.map((wt) => {
-        const branchDisplay = wt.branch.length > 40 ? wt.branch.substring(0, 37) + '...' : wt.branch;
+        const dirName = path.basename(wt.path);
+        const displayName = dirName.length > 60 ? dirName.substring(0, 57) + '...' : dirName;
         return {
-            name: `${branchDisplay.padEnd(40)} ${chalk.gray('→')} ${wt.path}`,
+            name: displayName,
             value: wt,
-            short: wt.branch
+            short: dirName
         };
     });
 
