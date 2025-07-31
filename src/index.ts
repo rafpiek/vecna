@@ -41,6 +41,11 @@ program
     .action((options) => import('./commands/switch').then(i => i.default(gitInstance, options)));
 
 program
+    .command('go <ticketNumber>')
+    .description('Navigate to worktree containing the specified ticket number')
+    .action((ticketNumber) => import('./commands/go').then(i => i.default(gitInstance, ticketNumber)));
+
+program
     .command('shell-install')
     .description('Install shell integration for better worktree switching')
     .action(() => import('./commands/shell-install').then(i => i.default()));

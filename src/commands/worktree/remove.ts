@@ -4,6 +4,7 @@ import { worktreeManager } from '../../utils/worktreeManager';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import fs from 'fs-extra';
+import path from 'path';
 
 interface RemoveOptions {
     force?: boolean;
@@ -16,7 +17,13 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
 
     try {
         // Get all worktrees
-        const worktrees = await manager.listWorktrees();
+        const allWorktrees = await manager.listWorktrees();
+        
+        // Filter out main repo directory - just remove "chatchat" for now (same as switch command)
+        const worktrees = allWorktrees.filter(wt => {
+            const dirName = path.basename(wt.path);
+            return dirName !== 'chatchat';
+        });
 
         if (worktrees.length === 0) {
             console.log(chalk.yellow('No worktrees found.'));
