@@ -52,6 +52,8 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
     const config = configManager(fs);
 
     const create = async (branchName: string, fromBranch: string = 'main'): Promise<void> => {
+        console.log(`DEBUG: worktreeManager.create called with branchName='${branchName}', fromBranch='${fromBranch}'`);
+        
         const worktreeDir = path.join(homedir(), 'dev', 'trees');
         const worktreeName = branchName.replace(/\//g, '-');
         const worktreePath = path.join(worktreeDir, worktreeName);
@@ -65,9 +67,13 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
 
         // Check if branch exists, if not create it with the worktree
         const branchExists = await gitRepo.branchExists(branchName);
+        console.log(`DEBUG: branchExists('${branchName}') = ${branchExists}`);
+        
         if (branchExists) {
+            console.log(`DEBUG: Branch exists, calling addWorktree('${worktreePath}', '${branchName}')`);
             await gitRepo.addWorktree(worktreePath, branchName);
         } else {
+            console.log(`DEBUG: Branch doesn't exist, calling addWorktreeWithNewBranch('${worktreePath}', '${branchName}', '${fromBranch}')`);
             await gitRepo.addWorktreeWithNewBranch(worktreePath, branchName, fromBranch);
         }
 
