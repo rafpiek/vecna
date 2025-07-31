@@ -11,12 +11,19 @@ jest.mock('listr2', () => {
                     const ctx = {};
 
                     for (const task of tasks) {
+                        // Check if task should be skipped
+                        if (task.skip) {
+                            const shouldSkip = typeof task.skip === 'function' ? await task.skip() : task.skip;
+                            if (shouldSkip) continue;
+                        }
+
+                        // Execute task with appropriate mock context
                         if (task.title === 'Enter branch name') {
                             await task.task(ctx, { prompt: () => Promise.resolve('feature/new-branch') });
                         } else if (task.title === 'Choose source branch') {
                             await task.task(ctx, { prompt: () => Promise.resolve('main') });
-                        } else if (!task.skip || !(typeof task.skip === 'function' ? await task.skip() : task.skip)) {
-                            await task.task(ctx);
+                        } else {
+                            await task.task(ctx, { title: task.title });
                         }
                     }
 
@@ -70,7 +77,7 @@ describe('start command', () => {
             checkout: jest.fn(),
             pull: jest.fn(),
             getCurrentBranch: jest.fn().mockResolvedValue('main'),
-            branchExists: jest.fn().mockResolvedValue(false),
+            branchExists: jest.fn().mockResolvedValue(true), // Default to true so branches are found
             createBranch: jest.fn(),
             hasRemotes: jest.fn().mockResolvedValue(true),
             hasTrackingBranch: jest.fn().mockResolvedValue(true),
@@ -111,12 +118,12 @@ describe('start command', () => {
         expect(manager.runPostCreateScripts).toHaveBeenCalled();
     });
 
-    it('should checkout to main if not already on main', async () => {
+    it('should prepare main as source branch when not on main', async () => {
         git.getCurrentBranch.mockResolvedValue('feature/other-branch');
 
         await start({} as any);
 
-        expect(git.checkout).toHaveBeenCalledWith('main');
+        expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'main');
     });
 
     it('should use branch from options if provided', async () => {
@@ -135,7 +142,6 @@ describe('start command', () => {
     it('should use custom from branch if specified', async () => {
         await start({} as any, { from: 'develop' });
 
-        expect(git.checkout).toHaveBeenCalledWith('develop');
         expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'develop');
     });
 
@@ -148,11 +154,60 @@ describe('start command', () => {
         expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'main');
     });
 
-    it('should use main as source branch when already on main', async () => {
+    it('should prompt for source branch even when on main', async () => {
         git.getCurrentBranch.mockResolvedValue('main');
         
         await start({} as any);
 
         expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'main');
+    });
+
+    it('should allow user to choose current branch when prompted', async () => {
+        git.getCurrentBranch.mockResolvedValue('feature/current-branch');
+        // Ensure the current branch exists so it doesn't fall back to main
+        git.branchExists.mockImplementation((branchName: string) => {
+            return Promise.resolve(branchName === 'feature/current-branch' || branchName === 'main');
+        });
+        
+        // Mock the Listr to return 'current' choice instead of 'main'
+        const originalMock = (Listr as jest.Mock).mockImplementation;
+        (Listr as jest.Mock).mockImplementation((tasks) => {
+            return {
+                run: async () => {
+                    const ctx = {};
+
+                    for (const task of tasks) {
+                        // Check if task should be skipped
+                        if (task.skip) {
+                            const shouldSkip = typeof task.skip === 'function' ? await task.skip() : task.skip;
+                            if (shouldSkip) continue;
+                        }
+
+                        // Execute task with appropriate mock context
+                        if (task.title === 'Enter branch name') {
+                            await task.task(ctx, { prompt: () => Promise.resolve('feature/new-branch') });
+                        } else if (task.title === 'Choose source branch') {
+                            await task.task(ctx, { prompt: () => Promise.resolve('current') }); // Choose current branch
+                        } else {
+                            await task.task(ctx, { title: task.title });
+                        }
+                    }
+
+                    return {
+                        branchName: 'feature/new-branch',
+                        worktreePath: '/Users/test/dev/trees/feature-new-branch',
+                        sourceBranch: 'feature/current-branch',
+                        worktreeCreated: true
+                    };
+                }
+            };
+        });
+
+        await start({} as any);
+
+        expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'feature/current-branch');
+        
+        // Restore original mock
+        (Listr as jest.Mock).mockImplementation(originalMock);
     });
 });

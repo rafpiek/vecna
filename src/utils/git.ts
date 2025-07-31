@@ -85,8 +85,32 @@ export const gitUtils = (git: SimpleGit) => ({
         await git.checkout(args);
     },
     branchExists: async (name: string): Promise<boolean> => {
-        const branches = await git.branchLocal();
-        return branches.all.includes(name);
+        try {
+            // Check local branches first
+            const localBranches = await git.branchLocal();
+            if (localBranches.all.includes(name)) {
+                return true;
+            }
+            
+            // Check remote branches
+            const remoteBranches = await git.branch(['-r']);
+            const remoteNames = remoteBranches.all.map(branch => 
+                branch.startsWith('origin/') ? branch.substring(7) : branch
+            );
+            if (remoteNames.includes(name)) {
+                return true;
+            }
+            
+            // Check if it exists as a commit reference (handles worktree branches)
+            try {
+                await git.raw(['rev-parse', '--verify', name]);
+                return true;
+            } catch {
+                return false;
+            }
+        } catch {
+            return false;
+        }
     },
     getCurrentBranch: async (): Promise<string> => {
         return (await git.branchLocal()).current;

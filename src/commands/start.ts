@@ -61,6 +61,9 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
     const manager = worktreeManager(gitInstance);
     const config = configManager(fs);
     
+    // Get current branch BEFORE switching directories
+    const originalCurrentBranch = await git.getCurrentBranch();
+    
     // Determine project context
     const projectContext = await getProjectContext(gitInstance, config);
     if (!projectContext) {
@@ -74,33 +77,85 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
         gitInstance.cwd(projectContext.path);
     }
 
-    // Get branch name from options or prompt
-    const branchName = options.branch || await getBranchName();
-    const fromBranch = options.from || await getSourceBranch(git);
+    // These will be set by the tasks
+    let branchName = options.branch;
+    let fromBranch = options.from;
     const shouldInstall = options.install !== false;
 
-    // Generate worktree path
-    const worktreeDir = path.join(homedir(), 'dev', 'trees');
-    const worktreeName = branchName.replace(/\//g, '-');
-    const worktreePath = path.join(worktreeDir, worktreeName);
-
     const tasks = new Listr([
+        {
+            title: 'Enter branch name',
+            skip: () => !!branchName,
+            task: async (ctx, task) => {
+                branchName = await task.prompt({
+                    type: 'input',
+                    message: 'Enter branch name:',
+                });
+
+                if (!branchName) {
+                    throw new Error('Branch name is required');
+                }
+            },
+        },
         {
             title: 'Validating branch name',
             task: async (ctx) => {
                 if (!branchName) {
                     throw new Error('Branch name is required');
                 }
+                
+                // Generate worktree path
+                const worktreeDir = path.join(homedir(), 'dev', 'trees');
+                const worktreeName = branchName.replace(/\//g, '-');
+                const worktreePath = path.join(worktreeDir, worktreeName);
+                
                 ctx.branchName = branchName;
                 ctx.worktreePath = worktreePath;
             },
         },
         {
-            title: `Checking out to ${fromBranch} branch`,
-            task: async () => {
-                const currentBranch = await git.getCurrentBranch();
-                if (currentBranch !== fromBranch) {
-                    await git.checkout(fromBranch);
+            title: 'Choose source branch',
+            skip: () => !!fromBranch,
+            task: async (ctx, task) => {
+                const choice = await task.prompt({
+                    type: 'select',
+                    message: 'Create worktree from:',
+                    choices: [
+                        { name: `Current branch (${originalCurrentBranch})`, value: 'current' },
+                        { name: 'Main branch', value: 'main' },
+                    ],
+                });
+
+                console.log(`DEBUG: User selected choice: '${choice}'`);
+                console.log(`DEBUG: originalCurrentBranch: '${originalCurrentBranch}'`);
+
+                if (choice === 'current') {
+                    fromBranch = originalCurrentBranch;
+                    console.log(`DEBUG: Set fromBranch to current branch: '${fromBranch}'`);
+                } else {
+                    fromBranch = 'main';
+                    console.log(`DEBUG: Set fromBranch to main: '${fromBranch}'`);
+                }
+            },
+        },
+        {
+            title: 'Preparing source branch',
+            task: async (ctx, task) => {
+                // Ensure fromBranch is set (fallback to main if somehow not set)
+                if (!fromBranch) {
+                    fromBranch = 'main';
+                }
+                
+                task.title = `Will create new worktree from: ${fromBranch}`;
+                
+                // Check if source branch exists in main repo
+                const sourceBranchExists = await git.branchExists(fromBranch);
+                if (!sourceBranchExists && fromBranch !== 'main') {
+                    // If the source branch doesn't exist in main repo, we need to handle this
+                    // For now, fall back to main as the source
+                    console.log(`Warning: Branch '${fromBranch}' not found in main repository, using 'main' instead`);
+                    fromBranch = 'main';
+                    task.title = `Will create new worktree from: ${fromBranch} (fallback)`;
                 }
             },
         },
@@ -124,6 +179,9 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
         {
             title: 'Checking branch availability',
             task: async () => {
+                if (!branchName) {
+                    throw new Error('Branch name is required');
+                }
                 const branchInUse = await git.isBranchInUseByWorktree(branchName);
                 if (branchInUse.inUse) {
                     throw new Error(`Branch '${branchName}' is already checked out in worktree: ${branchInUse.worktreePath}. Use 'vecna switch' to navigate there, or choose a different branch name.`);
@@ -133,6 +191,10 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
         {
             title: 'Creating worktree',
             task: async (ctx) => {
+                if (!branchName || !fromBranch) {
+                    throw new Error('Branch name and source branch are required');
+                }
+                console.log(`DEBUG: Creating worktree '${branchName}' from source branch '${fromBranch}'`);
                 await manager.create(branchName, fromBranch);
                 ctx.worktreeCreated = true;
             },
@@ -209,57 +271,7 @@ async function getProjectContext(gitInstance: SimpleGit, config: any) {
     return null;
 }
 
-async function getBranchName(): Promise<string> {
-    const tasks = new Listr([
-        {
-            title: 'Enter branch name',
-            task: async (ctx, task) => {
-                const branchName = await task.prompt({
-                    type: 'input',
-                    message: 'Enter branch name:',
-                });
 
-                if (!branchName) {
-                    throw new Error('Branch name is required');
-                }
-
-                ctx.branchName = branchName;
-            },
-        },
-    ]);
-
-    const { branchName } = await tasks.run();
-    return branchName;
-}
-
-async function getSourceBranch(git: any): Promise<string> {
-    const currentBranch = await git.getCurrentBranch();
-    
-    if (currentBranch === 'main') {
-        return 'main';
-    }
-
-    const tasks = new Listr([
-        {
-            title: 'Choose source branch',
-            task: async (ctx, task) => {
-                const choice = await task.prompt({
-                    type: 'select',
-                    message: 'Create worktree from:',
-                    choices: [
-                        { name: `Current branch (${currentBranch})`, value: 'current' },
-                        { name: 'Main branch', value: 'main' },
-                    ],
-                });
-
-                ctx.sourceBranch = choice === 'current' ? currentBranch : 'main';
-            },
-        },
-    ]);
-
-    const { sourceBranch } = await tasks.run();
-    return sourceBranch;
-}
 
 async function openInEditor(worktreePath: string, branchName: string) {
     console.log(chalk.cyan(`\n📂 Opening ${branchName} in cursor...`));
