@@ -76,7 +76,7 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
 
     // Get branch name from options or prompt
     const branchName = options.branch || await getBranchName();
-    const fromBranch = options.from || 'main';
+    const fromBranch = options.from || await getSourceBranch(git);
     const shouldInstall = options.install !== false;
 
     // Generate worktree path
@@ -230,6 +230,35 @@ async function getBranchName(): Promise<string> {
 
     const { branchName } = await tasks.run();
     return branchName;
+}
+
+async function getSourceBranch(git: any): Promise<string> {
+    const currentBranch = await git.getCurrentBranch();
+    
+    if (currentBranch === 'main') {
+        return 'main';
+    }
+
+    const tasks = new Listr([
+        {
+            title: 'Choose source branch',
+            task: async (ctx, task) => {
+                const choice = await task.prompt({
+                    type: 'select',
+                    message: 'Create worktree from:',
+                    choices: [
+                        { name: `Current branch (${currentBranch})`, value: 'current' },
+                        { name: 'Main branch', value: 'main' },
+                    ],
+                });
+
+                ctx.sourceBranch = choice === 'current' ? currentBranch : 'main';
+            },
+        },
+    ]);
+
+    const { sourceBranch } = await tasks.run();
+    return sourceBranch;
 }
 
 async function openInEditor(worktreePath: string, branchName: string) {
