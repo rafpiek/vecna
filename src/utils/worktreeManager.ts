@@ -135,32 +135,55 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         const worktrees = await gitRepo.listWorktrees();
 
         const worktreeInfoPromises = worktrees.map(async (worktree) => {
-            const [commitInfo, aheadBehind, hasUncommittedChanges, remoteExists] = await Promise.all([
-                gitRepo.getCommitInfo(worktree.branch),
-                gitRepo.getAheadBehind(worktree.branch),
-                gitRepo.hasUncommittedChanges(),
-                gitRepo.doesRemoteBranchExist(worktree.branch),
-            ]);
-
-            return {
-                name: worktree.branch,
-                branch: worktree.branch,
-                path: worktree.path,
-                isCurrent: worktree.isCurrent,
-                isActive: true, // Placeholder
-                lastCommit: {
-                    hash: commitInfo.hash,
-                    message: commitInfo.message,
-                    date: new Date(commitInfo.date),
-                },
-                status: {
-                    hasUncommittedChanges,
-                    ahead: aheadBehind.ahead,
-                    behind: aheadBehind.behind,
-                    remoteExists,
-                },
-                diskUsage: 'N/A', // Placeholder
-            };
+            try {
+                const [commitInfo, aheadBehind, hasUncommittedChanges, remoteExists] = await Promise.all([
+                    gitRepo.getCommitInfo(worktree.branch),
+                    gitRepo.getAheadBehind(worktree.branch),
+                    gitRepo.hasUncommittedChanges(),
+                    gitRepo.doesRemoteBranchExist(worktree.branch),
+                ]);
+                
+                return {
+                    name: worktree.branch, // Use branch as name since GitWorktree doesn't have name property
+                    branch: worktree.branch,
+                    path: worktree.path,
+                    isCurrent: worktree.isCurrent,
+                    isActive: true, // Add required isActive property
+                    lastCommit: {
+                        hash: commitInfo.hash,
+                        message: commitInfo.message,
+                        date: new Date(commitInfo.date),
+                    },
+                    status: {
+                        hasUncommittedChanges,
+                        ahead: aheadBehind.ahead,
+                        behind: aheadBehind.behind,
+                        remoteExists,
+                    },
+                };
+            } catch (error) {
+                // If there's an error fetching status, provide safe defaults
+                console.warn(`Warning: Could not fetch complete status for worktree ${worktree.branch}:`, error instanceof Error ? error.message : String(error));
+                
+                return {
+                    name: worktree.branch, // Use branch as name since GitWorktree doesn't have name property
+                    branch: worktree.branch,
+                    path: worktree.path,
+                    isCurrent: worktree.isCurrent,
+                    isActive: true, // Add required isActive property
+                    lastCommit: {
+                        hash: 'unknown',
+                        message: 'Could not fetch commit info',
+                        date: new Date(),
+                    },
+                    status: {
+                        hasUncommittedChanges: false,
+                        ahead: 0,
+                        behind: 0,
+                        remoteExists: true, // Default to true to avoid showing as "deleted" when we can't check
+                    },
+                };
+            }
         });
 
         return Promise.all(worktreeInfoPromises);
