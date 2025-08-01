@@ -123,7 +123,17 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
 
             try {
                 await git.removeWorktree(worktree.path, options.force);
-                console.log(chalk.green(`✓ Removed ${worktree.branch}`));
+                console.log(chalk.green(`✓ Removed worktree ${worktree.branch}`));
+
+                // Also delete the local branch
+                try {
+                    await git.deleteBranch(worktree.branch, options.force);
+                    console.log(chalk.green(`✓ Deleted local branch ${worktree.branch}`));
+                } catch (branchError) {
+                    const branchErrorMessage = branchError instanceof Error ? branchError.message : String(branchError);
+                    console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
+                    console.log(chalk.gray(`You may need to delete it manually: git branch -D ${worktree.branch}`));
+                }
 
                 // Clean up any remaining state
                 await manager.cleanWorktreeState(worktree.name);
@@ -145,7 +155,16 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
                     if (retryWithForce) {
                         try {
                             await git.removeWorktree(worktree.path, true);
-                            console.log(chalk.green(`✓ Force removed ${worktree.branch}`));
+                            console.log(chalk.green(`✓ Force removed worktree ${worktree.branch}`));
+                            
+                            // Also try to delete the local branch with force
+                            try {
+                                await git.deleteBranch(worktree.branch, true);
+                                console.log(chalk.green(`✓ Force deleted local branch ${worktree.branch}`));
+                            } catch (branchError) {
+                                const branchErrorMessage = branchError instanceof Error ? branchError.message : String(branchError);
+                                console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
+                            }
                         } catch (forceError) {
                             const forceErrorMessage = forceError instanceof Error ? forceError.message : String(forceError);
                             console.error(chalk.red(`✗ Force removal also failed: ${forceErrorMessage}`));

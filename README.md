@@ -191,7 +191,7 @@ vecna worktree list --active
 ```
 
 #### `vecna worktree remove [name]`
-Remove worktrees with safety checks.
+Remove worktrees and their associated local branches with safety checks.
 
 ```bash
 # Interactive selection with fuzzy search and status indicators (default)
@@ -206,6 +206,12 @@ vecna worktree remove feature-payment --force
 # Remove all unused worktrees
 vecna worktree remove --all-unused
 ```
+
+**Complete Cleanup:**
+- ✅ Removes the worktree directory
+- ✅ Deletes the associated local branch
+- ✅ Cleans up internal state
+- ✅ Shows clear success/failure messages
 
 **Status Indicators:**
 - 🗑️ Remote branch deleted (red - safe to remove)
