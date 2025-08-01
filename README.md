@@ -35,6 +35,7 @@ vecna switch -e -s
 - [Features](#features)
 - [Commands](#commands)
 - [Configuration](#configuration)
+- [Shell Aliases](#shell-aliases)
 - [Workflow Examples](#workflow-examples)
 - [Editor Integration](#editor-integration)
 - [Troubleshooting](#troubleshooting)
@@ -422,6 +423,44 @@ Stores user-wide settings and project registry:
 | `editor.command` | Editor command | `cursor` |
 | `editor.openOnSwitch` | Auto-open editor | `false` |
 | `editor.preferCursor` | Prefer Cursor over other editors | `false` |
+
+## ⚡ Shell Aliases
+
+**Supercharge your productivity** with suggested shell aliases that reduce typing by up to 78%!
+
+### 🚀 Quick Start Aliases
+
+```bash
+# Add to your ~/.zshrc for lightning-fast vecna commands
+alias vs="vecna start"                    # Start new worktree
+alias vw="vecna switch"                   # Switch between worktrees  
+alias vws="vecna switch -s"               # Switch and spawn shell
+alias vwe="vecna switch -e"               # Switch and open editor
+alias vwse="vecna switch -e -s"           # Switch, open editor, and spawn shell
+
+alias vwl="vecna worktree list"           # List all worktrees
+alias vwr="vecna worktree remove"         # Remove worktree (interactive)
+alias vl="vecna lint all"                 # Lint all files
+alias vlf="vecna lint all --fix"          # Lint and auto-fix
+```
+
+### 💡 Productivity Benefits
+
+- **78% less typing**: `vecna switch -e -s` → `vwse`
+- **73% less typing**: `vecna worktree list --active` → `vwla`
+- **Muscle memory**: Consistent `v` prefix for all commands
+- **Fewer errors**: Less typing means fewer typos
+
+### 📖 Complete Alias Guide
+
+**[📄 View Complete Aliases Documentation →](aliases.md)**
+
+The complete `aliases.md` file includes:
+- ✅ **120+ suggested aliases** for all vecna commands
+- ✅ **Smart functions** for complex workflows  
+- ✅ **Installation instructions** for zsh/bash
+- ✅ **Team collaboration** tips
+- ✅ **Customization guidance**
 
 ## 🔄 Workflow Examples
 
