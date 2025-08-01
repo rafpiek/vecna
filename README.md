@@ -13,11 +13,20 @@ vecna setup
 # Create a new worktree (replaces complex manual workflow)
 vecna start --branch feature/user-auth
 
+# Create worktree and open in Cursor editor
+vecna start --branch feature/user-auth -e
+
 # Switch between worktrees interactively
 vecna switch
 
 # Open worktree in Cursor editor
 vecna switch -e
+
+# Spawn new shell in selected worktree
+vecna switch -s
+
+# Combine both - open in editor and spawn shell
+vecna switch -e -s
 ```
 
 ## 📋 Table of Contents
@@ -53,10 +62,11 @@ npm link  # Makes 'vecna' command available globally
 
 ### 🌳 **Advanced Worktree Management**
 - **One-command worktree creation** - Replace 8+ manual steps with `vecna start`
-- **Interactive worktree switching** - Visual selection with status indicators
+- **Interactive worktree switching** - Visual selection with status indicators and fuzzy search
 - **Automatic configuration copying** - master.key, application.yml, .env files
-- **Smart port management** - Auto-allocates ports for Procfile.dev (3001-4000)
 - **Dependency installation** - Automatic yarn/npm/pnpm detection and install
+- **Shell integration** - Spawn new shells directly in worktree directories
+- **Smart cleanup** - Automated cleanup of merged branches and orphaned worktrees
 
 ### 🎯 **Developer Experience**
 - **Rich interactive UI** - Colored output with progress indicators
@@ -111,6 +121,9 @@ vecna start --branch hotfix/urgent-fix --from production
 
 # Skip dependency installation
 vecna start --branch quick-test --no-install
+
+# Create worktree and open in Cursor editor
+vecna start --branch feature/payment-flow -e
 ```
 
 **Automated Process:**
@@ -120,9 +133,8 @@ vecna start --branch quick-test --no-install
 4. ✅ Creates branch if needed
 5. ✅ Creates worktree in `~/dev/trees/`
 6. ✅ Copies configuration files
-7. ✅ Updates Procfile.dev ports
-8. ✅ Installs dependencies
-9. ✅ Opens in editor (if configured)
+7. ✅ Installs dependencies
+8. ✅ Opens in editor (if `-e` flag used)
 
 #### `vecna switch [options]`
 Interactive worktree switching with rich UI.
@@ -135,17 +147,31 @@ vecna switch
 vecna switch -e
 vecna switch --editor
 
+# Spawn new shell in selected worktree directory
+vecna switch -s
+vecna switch --shell
+
+# Combine multiple options
+vecna switch -e -s  # Open in editor AND spawn shell
+
 # JSON output for scripts
 vecna switch --json
+
+# Path-only output for command substitution
+vecna switch --path
 ```
 
 **Interactive Features:**
 - 🔄 **Switch to worktree** - Navigate to directory (default behavior)
 - 🚀 **Switch and open in editor** - Navigate + open editor (with `-e` flag)
-- 📝 **Show detailed info** - Commit history, status
-- 🗑️ **Delete worktree** - Safe removal with confirmations
-- 📂 **Open in editor** - Launch configured editor
-- 🔄 **Refresh list** - Update worktree status
+- 🐚 **Spawn new shell** - Open new shell in worktree directory (with `-s` flag)
+- 🎯 **Fuzzy search** - Type to filter worktrees by name
+- 📊 **Status indicators** - Visual indicators show worktree status at a glance
+- 📋 **Multiple output modes** - JSON, path-only, or interactive
+- 🏠 **Project context** - Works from any directory with default project
+
+**Status Indicators:**
+- 🗑️ Remote deleted (red) - ● Current (green) - ● Changes (yellow) - ● Sync needed (blue) - ○ Clean (gray)
 
 ### Worktree Management
 
@@ -167,10 +193,10 @@ vecna worktree list --active
 Remove worktrees with safety checks.
 
 ```bash
-# Interactive selection
+# Interactive selection with fuzzy search and status indicators (default)
 vecna worktree remove
 
-# Remove specific worktree
+# Remove specific worktree by name
 vecna worktree remove feature-payment
 
 # Force removal (skip confirmations)
@@ -180,22 +206,36 @@ vecna worktree remove feature-payment --force
 vecna worktree remove --all-unused
 ```
 
+**Status Indicators:**
+- 🗑️ Remote branch deleted (red - safe to remove)
+- ● Current worktree (green)
+- ● Has uncommitted changes (yellow)
+- ● Ahead/behind remote (blue)
+- ○ Clean worktree (gray)
+
 #### `vecna worktree info [name]`
 Show detailed information about a worktree.
 
 ```bash
-# Interactive selection
+# Interactive selection with fuzzy search (default)
 vecna worktree info
 
-# Specific worktree
+# Specific worktree by name
 vecna worktree info feature-payment
 ```
 
-#### `vecna worktree clean`
+#### `vecna worktree clean [options]`
 Clean up orphaned worktrees and verify integrity.
 
 ```bash
+# Interactive cleanup
 vecna worktree clean
+
+# See what would be cleaned without making changes
+vecna worktree clean --dry-run
+
+# Skip confirmation prompts
+vecna worktree clean --force
 ```
 
 ### Development Tools
@@ -243,11 +283,65 @@ Install shell integration for seamless directory switching.
 vecna shell-install
 ```
 
+**Features:**
+- Auto-detects shell type (bash, zsh, fish)
+- Adds `vecna-switch` function to shell configuration
+- Enables automatic directory changes
+- Works across different operating systems
+
+#### `vecna go <ticketNumber>`
+Navigate to worktree containing the specified ticket number.
+
+```bash
+# Find and navigate to worktree with ticket number
+vecna go PROJ-123
+vecna go 456
+```
+
+#### `vecna tidy [options]`
+Clean up merged branches and associated worktrees.
+
+```bash
+# Interactive cleanup of merged branches
+vecna tidy
+
+# See what would be cleaned without making changes
+vecna tidy --dry-run
+
+# Skip confirmation prompts
+vecna tidy --force
+
+# Protect branches matching pattern
+vecna tidy --keep-pattern "release/*"
+```
+
 #### `vecna list`
 List all registered projects.
 
 ```bash
 vecna list
+```
+
+#### `vecna default [options]`
+Manage default project settings.
+
+```bash
+# Show current default project
+vecna default
+
+# Set default project interactively
+vecna default --project
+vecna default -p
+
+# Clear default project
+vecna default --clear
+```
+
+#### `vecna reset`
+Reset global configuration (removes all project settings).
+
+```bash
+vecna reset
 ```
 
 ## ⚙️ Configuration
@@ -308,7 +402,11 @@ Stores user-wide settings and project registry:
       "path": "/Users/you/dev/my-project",
       "mainBranch": "main"
     }
-  ]
+  ],
+  "defaultProject": {
+    "name": "my-project",
+    "path": "/Users/you/dev/my-project"
+  }
 }
 ```
 
@@ -330,11 +428,11 @@ Stores user-wide settings and project registry:
 ### Feature Development
 
 ```bash
-# Start working on a new feature
-vecna start --branch feature/user-authentication
+# Start working on a new feature with editor
+vecna start --branch feature/user-authentication -e
 
 # Switch between main and feature work
-vecna switch -e  # Opens selected worktree in Cursor
+vecna switch -e -s  # Opens in Cursor AND spawns shell
 
 # When done, clean up
 vecna worktree remove feature-user-authentication
@@ -343,12 +441,12 @@ vecna worktree remove feature-user-authentication
 ### Hotfix Workflow
 
 ```bash
-# Create hotfix from production
-vecna start --branch hotfix/security-patch --from production
+# Create hotfix from production and open in editor
+vecna start --branch hotfix/security-patch --from production -e
 
-# Quick switch for testing
-vecna switch
-# Select: hotfix/security-patch → 🔄 Switch to worktree
+# Quick switch with shell spawn for testing
+vecna switch -s
+# Select: hotfix/security-patch → spawns shell in worktree
 
 # Clean up when deployed
 vecna worktree remove hotfix-security-patch
@@ -365,8 +463,20 @@ vecna start --branch bugfix/login-issue
 # View all active work
 vecna worktree list
 
-# Switch between them efficiently
-vecna switch
+# Switch between them efficiently with shell spawning
+vecna switch -s  # Interactive selection + new shell in directory
+```
+
+### Development Environment Setup
+
+```bash
+# Complete development setup in one command
+vecna switch -e -s
+# This will:
+# 1. Show interactive worktree selector
+# 2. Open selected worktree in Cursor editor
+# 3. Spawn new shell in that directory
+# 4. Ready to code immediately!
 ```
 
 ## 🖥️ Editor Integration
@@ -385,7 +495,14 @@ Vecna provides first-class support for [Cursor](https://cursor.sh/), the AI-powe
 
 **Interactive Switch:**
 ```bash
-vecna switch -e  # Select worktree and open in Cursor
+# Select worktree and open in Cursor
+vecna switch -e
+
+# Select worktree and spawn shell
+vecna switch -s
+
+# Both editor and shell
+vecna switch -e -s
 ```
 
 **Auto-open Configuration:**
@@ -456,13 +573,16 @@ Error [ERR_REQUIRE_ESM]: require() of ES Module clipboardy
 2. Add Cursor to PATH: `ln -s /Applications/Cursor.app/Contents/Resources/app/bin/cursor /usr/local/bin/cursor`
 3. Use alternative editor in configuration
 
-#### Port Conflicts
+#### Shell Integration Issues
 
-**Problem:** Procfile.dev port already in use
+**Problem:** Shell commands not working after `vecna switch -s`
 
-**Solution:** Vecna automatically finds available ports (3001-4000). Check with:
+**Solution:** Ensure your shell configuration is properly loaded:
 ```bash
-lsof -i :3000  # Check what's using port 3000
+# For bash/zsh users
+source ~/.bashrc  # or ~/.zshrc
+
+# Or restart your terminal
 ```
 
 ### Debug Mode

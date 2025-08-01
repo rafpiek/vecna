@@ -22,6 +22,7 @@ interface WorktreeInfo {
     hasUncommittedChanges: boolean;
     ahead: number;
     behind: number;
+    remoteExists: boolean;
   };
   diskUsage?: string;
 }
@@ -92,7 +93,8 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
             status: {
                 hasUncommittedChanges: false,
                 ahead: 0,
-                behind: 0
+                behind: 0,
+                remoteExists: true
             }
         });
     };
@@ -133,10 +135,11 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         const worktrees = await gitRepo.listWorktrees();
 
         const worktreeInfoPromises = worktrees.map(async (worktree) => {
-            const [commitInfo, aheadBehind, hasUncommittedChanges] = await Promise.all([
+            const [commitInfo, aheadBehind, hasUncommittedChanges, remoteExists] = await Promise.all([
                 gitRepo.getCommitInfo(worktree.branch),
                 gitRepo.getAheadBehind(worktree.branch),
                 gitRepo.hasUncommittedChanges(),
+                gitRepo.doesRemoteBranchExist(worktree.branch),
             ]);
 
             return {
@@ -154,6 +157,7 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
                     hasUncommittedChanges,
                     ahead: aheadBehind.ahead,
                     behind: aheadBehind.behind,
+                    remoteExists,
                 },
                 diskUsage: 'N/A', // Placeholder
             };

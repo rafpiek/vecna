@@ -1,8 +1,8 @@
 import { SimpleGit } from 'simple-git';
 import { gitUtils } from '../utils/git';
 import { configManager } from '../utils/configManager';
+import { selectWorktreeWithFuzzySearch } from '../utils/worktreePicker';
 import inquirer from 'inquirer';
-import { search } from '@inquirer/prompts';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
@@ -51,35 +51,9 @@ interface SwitchOptions {
     json?: boolean;
     editor?: boolean;
     path?: boolean;
+    shell?: boolean;
 }
 
-async function selectWorktreeWithFuzzySearch(worktrees: any[]): Promise<any> {
-    const choices = worktrees.map((wt) => {
-        const dirName = path.basename(wt.path);
-        return {
-            name: dirName,
-            value: wt
-        };
-    });
-
-    const selected = await search({
-        message: 'Choose worktree to navigate to:',
-        source: async (input) => {
-            if (!input) {
-                return choices;
-            }
-            
-            // Simple fuzzy matching - case insensitive substring search
-            const filtered = choices.filter(choice => 
-                choice.name.toLowerCase().includes(input.toLowerCase())
-            );
-            
-            return filtered;
-        }
-    });
-
-    return selected;
-}
 
 async function selectWorktreeForJson(worktrees: any[]): Promise<any> {
     return await selectWorktreeWithFuzzySearch(worktrees);
@@ -165,7 +139,7 @@ export default async (gitInstance: SimpleGit, options: SwitchOptions = {}) => {
         }
 
         // Simple interactive selection
-        await showSimpleWorktreeSelector(worktrees, options.editor || false, projectContext);
+        await showSimpleWorktreeSelector(worktrees, options.editor || false, projectContext, options.shell || false);
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -281,17 +255,17 @@ async function showProjectPicker(config: any, options: SwitchOptions) {
         return;
     }
 
-    await showSimpleWorktreeSelector(worktrees, options.editor || false, selectedProject);
+    await showSimpleWorktreeSelector(worktrees, options.editor || false, selectedProject, options.shell || false);
 }
 
-async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: boolean = false, projectContext?: any): Promise<void> {
+async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: boolean = false, projectContext?: any, shouldSpawnShell: boolean = false): Promise<void> {
     // Redirect all interactive output to stderr to keep stdout clean for shell integration
     const originalStdoutWrite = process.stdout.write;
     process.stdout.write = process.stderr.write.bind(process.stderr);
 
     console.log(chalk.cyan.bold('🌳 Select Worktree\n'));
 
-    const selectedWorktree = await selectWorktreeWithFuzzySearch(worktrees);
+    const selectedWorktree = await selectWorktreeWithFuzzySearch(worktrees, 'Choose worktree to navigate to:');
 
     // Copy cd command to clipboard
     const cdCommand = `cd "${selectedWorktree.path}"`;
@@ -307,6 +281,11 @@ async function showSimpleWorktreeSelector(worktrees: any[], shouldOpenInEditor: 
     // Optionally open in editor
     if (shouldOpenInEditor) {
         await openInEditor(selectedWorktree);
+    }
+
+    // Optionally spawn new shell
+    if (shouldSpawnShell) {
+        await spawnShell(selectedWorktree);
     }
 
     // Restore stdout
@@ -338,5 +317,38 @@ async function openInEditor(worktree: any) {
     } catch (error) {
         console.log(chalk.yellow('⚠️  Cursor not found. Install cursor or manually open:'));
         console.log(chalk.gray(`cursor "${worktree.path}"`));
+    }
+}
+
+async function spawnShell(worktree: any) {
+    console.log(chalk.cyan(`\n🐚 Spawning new shell in ${worktree.branch}...`));
+
+    try {
+        // Determine the user's shell
+        const userShell = process.env.SHELL || '/bin/bash';
+        console.log(chalk.gray(`Using shell: ${userShell}`));
+
+        // Spawn new shell in the worktree directory
+        const shellProcess = spawn(userShell, [], {
+            cwd: worktree.path,
+            stdio: 'inherit',
+            detached: false
+        });
+
+        // Wait for the shell to exit
+        shellProcess.on('close', (code) => {
+            if (code === 0) {
+                console.log(chalk.green('✓ Shell session ended'));
+            } else {
+                console.log(chalk.yellow(`⚠️  Shell exited with code ${code}`));
+            }
+        });
+
+        shellProcess.on('error', (error) => {
+            console.log(chalk.red('✗ Failed to spawn shell:'), error.message);
+        });
+
+    } catch (error) {
+        console.log(chalk.red('✗ Failed to spawn shell:'), error instanceof Error ? error.message : String(error));
     }
 }

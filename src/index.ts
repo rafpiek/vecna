@@ -38,6 +38,7 @@ program
     .option('--json', 'Output result in JSON format')
     .option('--path', 'Output only path for command substitution')
     .option('-e, --editor', 'Open selected worktree in editor (Cursor)')
+    .option('-s, --shell', 'Spawn new shell in selected worktree directory')
     .action((options) => import('./commands/switch').then(i => i.default(gitInstance, options)));
 
 program

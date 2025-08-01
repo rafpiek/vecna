@@ -1,6 +1,7 @@
 import { SimpleGit } from 'simple-git';
 import { gitUtils } from '../../utils/git';
 import { worktreeManager } from '../../utils/worktreeManager';
+import { selectWorktreeWithFuzzySearch } from '../../utils/worktreePicker';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import fs from 'fs-extra';
@@ -56,45 +57,16 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
             worktreesToRemove = [worktree];
 
         } else {
-            // Interactive selection
-            const choices = worktrees
-                .filter(wt => !wt.isCurrent) // Don't allow removing current worktree
-                .map(wt => {
-                    let status = '';
-                    if (wt.status.hasUncommittedChanges) {
-                        status = chalk.yellow(' (uncommitted changes)');
-                    }
-
-                    const diskUsage = wt.diskUsage || 'unknown';
-
-                    return {
-                        name: `${wt.branch}${status} - ${chalk.gray(wt.path)} ${chalk.gray(`[${diskUsage}]`)}`,
-                        value: wt,
-                        short: wt.branch
-                    };
-                });
-
-            if (choices.length === 0) {
+            // Interactive selection with fuzzy search
+            const availableWorktrees = worktrees.filter(wt => !wt.isCurrent); // Don't allow removing current worktree
+            
+            if (availableWorktrees.length === 0) {
                 console.log(chalk.yellow('No worktrees available for removal (cannot remove current worktree).'));
                 return;
             }
 
-            const { selectedWorktrees } = await inquirer.prompt([
-                {
-                    type: 'checkbox',
-                    name: 'selectedWorktrees',
-                    message: 'Select worktrees to remove:',
-                    choices,
-                    pageSize: 15
-                }
-            ]);
-
-            if (selectedWorktrees.length === 0) {
-                console.log(chalk.gray('No worktrees selected.'));
-                return;
-            }
-
-            worktreesToRemove = selectedWorktrees;
+            const selectedWorktree = await selectWorktreeWithFuzzySearch(availableWorktrees, 'Choose worktree to remove:');
+            worktreesToRemove = [selectedWorktree];
         }
 
         // Safety checks and confirmation

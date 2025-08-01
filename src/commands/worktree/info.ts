@@ -1,6 +1,7 @@
 import { SimpleGit } from 'simple-git';
 import { gitUtils } from '../../utils/git';
 import { worktreeManager } from '../../utils/worktreeManager';
+import { selectWorktreeWithFuzzySearch } from '../../utils/worktreePicker';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
@@ -33,13 +34,19 @@ export default async (gitInstance: SimpleGit, worktreeName?: string) => {
                 process.exit(1);
             }
         } else {
-            // Show current worktree info
-            targetWorktree = worktrees.find(wt => wt.isCurrent);
+            // Interactive selection with fuzzy search
+            // Filter out main repo directory - just remove "chatchat" for now (same as switch command)
+            const filteredWorktrees = worktrees.filter(wt => {
+                const dirName = path.basename(wt.path);
+                return dirName !== 'chatchat';
+            });
 
-            if (!targetWorktree) {
-                console.error(chalk.red('No current worktree found.'));
-                process.exit(1);
+            if (filteredWorktrees.length === 0) {
+                console.log(chalk.yellow('No worktrees found.'));
+                return;
             }
+
+            targetWorktree = await selectWorktreeWithFuzzySearch(filteredWorktrees, 'Choose worktree to view info:');
         }
 
         // Display detailed information
