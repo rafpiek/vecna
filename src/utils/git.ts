@@ -56,6 +56,9 @@ export const gitUtils = (git: SimpleGit) => ({
         const worktreeOutput = await git.raw('worktree', 'list', '--porcelain');
         const worktrees: GitWorktree[] = [];
         const lines = worktreeOutput.split('\n').filter(Boolean);
+        
+        // Get current working directory to determine which worktree is current
+        const currentPath = process.cwd();
 
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
@@ -63,7 +66,9 @@ export const gitUtils = (git: SimpleGit) => ({
             const path = line.substring('worktree '.length);
             const branchLine = lines[i + 2];
             const branch = branchLine.substring('branch refs/heads/'.length);
-            const isCurrent = lines.some((l: string) => l.startsWith('HEAD ') && lines.indexOf(l) < i + 4);
+            
+            // A worktree is current if we're currently in that directory
+            const isCurrent = currentPath === path || currentPath.startsWith(path + '/');
 
             worktrees.push({
               path,
