@@ -131,8 +131,41 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
                     console.log(chalk.green(`✓ Deleted local branch ${worktree.branch}`));
                 } catch (branchError) {
                     const branchErrorMessage = branchError instanceof Error ? branchError.message : String(branchError);
-                    console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
-                    console.log(chalk.gray(`You may need to delete it manually: git branch -D ${worktree.branch}`));
+                    
+                    // Check if it's an unmerged branch error
+                    if (branchErrorMessage.includes('not fully merged') || branchErrorMessage.includes('not merged')) {
+                        console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
+                        
+                        if (!options.force) {
+                            const { confirmForceDelete } = await inquirer.prompt([
+                                {
+                                    type: 'confirm',
+                                    name: 'confirmForceDelete',
+                                    message: `Force delete unmerged branch "${worktree.branch}"? (changes may be lost)`,
+                                    default: false
+                                }
+                            ]);
+
+                            if (confirmForceDelete) {
+                                try {
+                                    await git.deleteBranch(worktree.branch, true);
+                                    console.log(chalk.green(`✓ Force deleted local branch ${worktree.branch}`));
+                                } catch (forceDeleteError) {
+                                    const forceDeleteErrorMessage = forceDeleteError instanceof Error ? forceDeleteError.message : String(forceDeleteError);
+                                    console.log(chalk.yellow(`⚠️  Still could not delete local branch ${worktree.branch}: ${forceDeleteErrorMessage}`));
+                                    console.log(chalk.gray(`You may need to delete it manually: git branch -D ${worktree.branch}`));
+                                }
+                            } else {
+                                console.log(chalk.gray(`Skipped deletion of branch ${worktree.branch}`));
+                                console.log(chalk.gray(`You can delete it manually later: git branch -D ${worktree.branch}`));
+                            }
+                        } else {
+                            console.log(chalk.gray(`You may need to delete it manually: git branch -D ${worktree.branch}`));
+                        }
+                    } else {
+                        console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
+                        console.log(chalk.gray(`You may need to delete it manually: git branch -D ${worktree.branch}`));
+                    }
                 }
 
                 // Clean up any remaining state
@@ -164,6 +197,7 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
                             } catch (branchError) {
                                 const branchErrorMessage = branchError instanceof Error ? branchError.message : String(branchError);
                                 console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
+                                console.log(chalk.gray(`You may need to delete it manually: git branch -D ${worktree.branch}`));
                             }
                         } catch (forceError) {
                             const forceErrorMessage = forceError instanceof Error ? forceError.message : String(forceError);
