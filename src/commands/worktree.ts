@@ -23,6 +23,7 @@ worktreeCommand
     .description('Remove a worktree')
     .option('-f, --force', 'Skip confirmation prompts')
     .option('--all-unused', 'Remove all unused worktrees')
+    .option('--gone', 'List only worktrees that no longer exist on disk')
     .action((name, options) => {
         // We need to get the git instance from somewhere
         // For now, we'll import it dynamically

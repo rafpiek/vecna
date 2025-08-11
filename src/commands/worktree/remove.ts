@@ -10,6 +10,7 @@ import path from 'path';
 interface RemoveOptions {
     force?: boolean;
     allUnused?: boolean;
+    gone?: boolean;
 }
 
 export default async (gitInstance: SimpleGit, worktreeName?: string, options: RemoveOptions = {}) => {
@@ -33,7 +34,31 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
 
         let worktreesToRemove = [];
 
-        if (options.allUnused) {
+        if (options.gone) {
+            // Filter to only worktrees that don't exist on disk
+            const goneWorktrees = [];
+            for (const wt of worktrees) {
+                const exists = await fs.pathExists(wt.path);
+                if (!exists) {
+                    goneWorktrees.push(wt);
+                }
+            }
+            
+            if (goneWorktrees.length === 0) {
+                console.log(chalk.green('No gone worktrees found.'));
+                return;
+            }
+
+            console.log(chalk.yellow(`Found ${goneWorktrees.length} gone worktrees:`));
+            goneWorktrees.forEach(wt => {
+                console.log(`  - ${wt.branch} (${wt.path})`);
+            });
+
+            // For --gone flag, we list them but don't proceed with removal
+            // User needs to manually select or use specific name to remove
+            return;
+
+        } else if (options.allUnused) {
             // Remove all worktrees not accessed in X days (placeholder logic)
             worktreesToRemove = worktrees.filter(wt => !wt.isCurrent && !wt.status.hasUncommittedChanges);
 

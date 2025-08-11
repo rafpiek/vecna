@@ -2,10 +2,12 @@ import removeCommand from '../../../src/commands/worktree/remove';
 import { gitUtils } from '../../../src/utils/git';
 import { worktreeManager } from '../../../src/utils/worktreeManager';
 import inquirer from 'inquirer';
+import fs from 'fs-extra';
 
 jest.mock('../../../src/utils/git');
 jest.mock('../../../src/utils/worktreeManager');
 jest.mock('inquirer');
+jest.mock('fs-extra');
 jest.mock('chalk', () => ({
     green: (str: string) => str,
     cyan: (str: string) => str,
@@ -17,6 +19,7 @@ jest.mock('chalk', () => ({
 const mockedGitUtils = gitUtils as jest.Mock;
 const mockedWorktreeManager = worktreeManager as jest.Mock;
 const mockedInquirer = inquirer as jest.Mocked<typeof inquirer>;
+const mockedFs = fs as jest.Mocked<typeof fs>;
 
 describe('worktree remove command', () => {
     let git: any;
@@ -236,5 +239,87 @@ describe('worktree remove command', () => {
 
         expect(git.removeWorktree).toHaveBeenCalledWith('/Users/test/dev/trees/feature-test', true);
         expect(mockedInquirer.prompt).not.toHaveBeenCalled();
+    });
+
+    it('should list gone worktrees when --gone option is used', async () => {
+        const mockWorktrees = [
+            {
+                name: 'existing-worktree',
+                branch: 'feature/existing',
+                path: '/Users/test/dev/trees/existing-worktree',
+                isCurrent: false,
+                isActive: true,
+                lastCommit: {
+                    hash: 'abc123',
+                    message: 'Existing commit',
+                    date: new Date('2024-01-01'),
+                },
+                status: {
+                    hasUncommittedChanges: false,
+                    ahead: 0,
+                    behind: 0,
+                },
+            },
+            {
+                name: 'gone-worktree',
+                branch: 'feature/gone',
+                path: '/Users/test/dev/trees/gone-worktree',
+                isCurrent: false,
+                isActive: true,
+                lastCommit: {
+                    hash: 'def456',
+                    message: 'Gone commit',
+                    date: new Date('2024-01-02'),
+                },
+                status: {
+                    hasUncommittedChanges: false,
+                    ahead: 0,
+                    behind: 0,
+                },
+            },
+        ];
+
+        manager.listWorktrees.mockResolvedValue(mockWorktrees);
+        (mockedFs.pathExists as jest.Mock)
+            .mockResolvedValueOnce(true)  // existing worktree exists
+            .mockResolvedValueOnce(false); // gone worktree doesn't exist
+
+        await removeCommand({} as any, undefined, { gone: true });
+
+        expect(mockedFs.pathExists).toHaveBeenCalledWith('/Users/test/dev/trees/existing-worktree');
+        expect(mockedFs.pathExists).toHaveBeenCalledWith('/Users/test/dev/trees/gone-worktree');
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Found 1 gone worktrees'));
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('feature/gone'));
+        expect(git.removeWorktree).not.toHaveBeenCalled(); // Should not remove, just list
+    });
+
+    it('should show no gone worktrees message when all exist', async () => {
+        const mockWorktrees = [
+            {
+                name: 'existing-worktree',
+                branch: 'feature/existing',
+                path: '/Users/test/dev/trees/existing-worktree',
+                isCurrent: false,
+                isActive: true,
+                lastCommit: {
+                    hash: 'abc123',
+                    message: 'Existing commit',
+                    date: new Date('2024-01-01'),
+                },
+                status: {
+                    hasUncommittedChanges: false,
+                    ahead: 0,
+                    behind: 0,
+                },
+            },
+        ];
+
+        manager.listWorktrees.mockResolvedValue(mockWorktrees);
+        (mockedFs.pathExists as jest.Mock).mockResolvedValue(true); // all worktrees exist
+
+        await removeCommand({} as any, undefined, { gone: true });
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('No gone worktrees found'));
+        expect(git.removeWorktree).not.toHaveBeenCalled();
     });
 });
