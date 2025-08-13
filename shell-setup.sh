@@ -14,7 +14,8 @@
 function vecna() {
     export VECNA_SHELL=true
     local output
-    output=$(/Users/rafalpiekara/dev/vecna/dist/index.js "$@")
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    output=$("$script_dir/dist/index.js" "$@")
     if [[ -n "$output" ]]; then
         if [[ "$output" == "source "* ]]; then
             eval "$output"

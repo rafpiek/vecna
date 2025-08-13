@@ -12,10 +12,10 @@
     "test": "jest",
     "lint": "eslint src/**/*.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": ["cli", "git", "worktree", "development", "workflow", "monorepo"],
+  "author": "Rafal Piekara <rafal@piekara.me>",
+  "license": "MIT",
+  "description": "A powerful CLI tool for managing multi-language monorepos with advanced git worktree automation",
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.31.0",

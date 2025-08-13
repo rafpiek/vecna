@@ -205,6 +205,9 @@ vecna worktree remove feature-payment --force
 
 # Remove all unused worktrees
 vecna worktree remove --all-unused
+
+# List only worktrees that no longer exist on disk
+vecna worktree remove --gone
 ```
 
 **Complete Cleanup:**
@@ -270,7 +273,7 @@ vecna lint all --uncommitted
 vecna lint all --committed
 ```
 
-#### `vecna test [type]`
+#### `vecna test [type] [options]`
 Run tests with smart filtering.
 
 ```bash
@@ -279,6 +282,14 @@ vecna test all
 
 # Ruby tests only
 vecna test rb
+
+# Test only uncommitted changes
+vecna test all --uncommitted
+vecna test rb --uncommitted
+
+# Test only committed changes against main branch
+vecna test all --committed
+vecna test rb --committed
 ```
 
 ### Utility Commands
@@ -349,6 +360,13 @@ Reset global configuration (removes all project settings).
 
 ```bash
 vecna reset
+```
+
+#### `vecna version`
+Show the current version of vecna.
+
+```bash
+vecna version
 ```
 
 ## ⚙️ Configuration
@@ -446,8 +464,17 @@ alias vwse="vecna switch -e -s"           # Switch, open editor, and spawn shell
 
 alias vwl="vecna worktree list"           # List all worktrees
 alias vwr="vecna worktree remove"         # Remove worktree (interactive)
+alias vwi="vecna worktree info"           # Show worktree info
+alias vwc="vecna worktree clean"          # Clean orphaned worktrees
+
 alias vl="vecna lint all"                 # Lint all files
 alias vlf="vecna lint all --fix"          # Lint and auto-fix
+alias vt="vecna test all"                 # Run all tests
+alias vtidy="vecna tidy"                  # Clean up merged branches
+
+alias vg="vecna go"                       # Navigate to ticket worktree
+alias vlist="vecna list"                  # List all projects
+alias vsetup="vecna setup"                # Setup new project
 ```
 
 ### 💡 Productivity Benefits
