@@ -1,11 +1,13 @@
 import removeCommand from '../../../src/commands/worktree/remove';
 import { gitUtils } from '../../../src/utils/git';
 import { worktreeManager } from '../../../src/utils/worktreeManager';
+import { selectWorktreeWithFuzzySearch } from '../../../src/utils/worktreePicker';
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
 
 jest.mock('../../../src/utils/git');
 jest.mock('../../../src/utils/worktreeManager');
+jest.mock('../../../src/utils/worktreePicker');
 jest.mock('inquirer');
 jest.mock('fs-extra');
 jest.mock('chalk', () => ({
@@ -18,6 +20,7 @@ jest.mock('chalk', () => ({
 
 const mockedGitUtils = gitUtils as jest.Mock;
 const mockedWorktreeManager = worktreeManager as jest.Mock;
+const mockedSelectWorktreeWithFuzzySearch = selectWorktreeWithFuzzySearch as jest.Mock;
 const mockedInquirer = inquirer as jest.Mocked<typeof inquirer>;
 const mockedFs = fs as jest.Mocked<typeof fs>;
 
@@ -30,6 +33,7 @@ describe('worktree remove command', () => {
     beforeEach(() => {
         git = {
             removeWorktree: jest.fn(),
+            deleteBranch: jest.fn(),
         };
         manager = {
             listWorktrees: jest.fn(),
@@ -124,19 +128,14 @@ describe('worktree remove command', () => {
         ];
 
         manager.listWorktrees.mockResolvedValue(mockWorktrees);
-        mockedInquirer.prompt
-            .mockResolvedValueOnce({ selectedWorktrees: [mockWorktrees[1]] })
-            .mockResolvedValueOnce({ finalConfirm: true });
+        mockedSelectWorktreeWithFuzzySearch.mockResolvedValue(mockWorktrees[1]);
+        mockedInquirer.prompt.mockResolvedValue({ finalConfirm: true });
 
         await removeCommand({} as any);
 
-        expect(mockedInquirer.prompt).toHaveBeenCalledWith(
-            expect.arrayContaining([
-                expect.objectContaining({
-                    type: 'checkbox',
-                    name: 'selectedWorktrees',
-                })
-            ])
+        expect(mockedSelectWorktreeWithFuzzySearch).toHaveBeenCalledWith(
+            [mockWorktrees[1]], // Only non-current worktrees are available for selection
+            'Choose worktree to remove:'
         );
         expect(git.removeWorktree).toHaveBeenCalledWith('/Users/test/dev/trees/feature-test', undefined);
     });
@@ -163,8 +162,8 @@ describe('worktree remove command', () => {
         ];
 
         manager.listWorktrees.mockResolvedValue(mockWorktrees);
+        mockedSelectWorktreeWithFuzzySearch.mockResolvedValue(mockWorktrees[0]);
         mockedInquirer.prompt
-            .mockResolvedValueOnce({ selectedWorktrees: [mockWorktrees[0]] })
             .mockResolvedValueOnce({ confirmWithChanges: true })
             .mockResolvedValueOnce({ finalConfirm: true });
 
@@ -202,9 +201,8 @@ describe('worktree remove command', () => {
         ];
 
         manager.listWorktrees.mockResolvedValue(mockWorktrees);
-        mockedInquirer.prompt
-            .mockResolvedValueOnce({ selectedWorktrees: [mockWorktrees[0]] })
-            .mockResolvedValueOnce({ finalConfirm: false });
+        mockedSelectWorktreeWithFuzzySearch.mockResolvedValue(mockWorktrees[0]);
+        mockedInquirer.prompt.mockResolvedValue({ finalConfirm: false });
 
         await removeCommand({} as any);
 

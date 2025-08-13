@@ -118,12 +118,12 @@ describe('start command', () => {
         expect(manager.runPostCreateScripts).toHaveBeenCalled();
     });
 
-    it('should prepare main as source branch when not on main', async () => {
+    it('should use current branch as source branch when not on main', async () => {
         git.getCurrentBranch.mockResolvedValue('feature/other-branch');
 
         await start({} as any);
 
-        expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'main');
+        expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'feature/other-branch');
     });
 
     it('should use branch from options if provided', async () => {
@@ -145,13 +145,13 @@ describe('start command', () => {
         expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'develop');
     });
 
-    it('should prompt for source branch when not on main and no from option specified', async () => {
+    it('should use current branch as source when not on main and no from option specified', async () => {
         git.getCurrentBranch.mockResolvedValue('feature/current-branch');
         
         await start({} as any);
 
         expect(git.getCurrentBranch).toHaveBeenCalled();
-        expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'main');
+        expect(manager.create).toHaveBeenCalledWith('feature/new-branch', 'feature/current-branch');
     });
 
     it('should prompt for source branch even when on main', async () => {
