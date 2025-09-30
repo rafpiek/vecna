@@ -34,6 +34,7 @@ describe('worktree remove command', () => {
         git = {
             removeWorktree: jest.fn(),
             deleteBranch: jest.fn(),
+            fetchIfNeeded: jest.fn().mockResolvedValue(false),
         };
         manager = {
             listWorktrees: jest.fn(),

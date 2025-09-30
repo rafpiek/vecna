@@ -1,6 +1,7 @@
 import { SimpleGit, simpleGit, SimpleGitOptions } from 'simple-git';
 import path from 'path';
 import fs from 'fs-extra';
+import { fetchCacheManager } from './fetchCacheManager';
 
 export interface ModifiedFiles {
     committed: string[];
@@ -179,8 +180,11 @@ export const gitUtils = (git: SimpleGit) => ({
     
     doesRemoteBranchExist: async (branch: string): Promise<boolean> => {
         try {
-            const result = await git.raw(['ls-remote', '--heads', 'origin', branch]);
-            return result.trim().length > 0;
+            // Check local remote-tracking branches instead of hitting network with ls-remote
+            // This assumes fetch has been called recently (via fetchIfNeeded)
+            const remoteBranches = await git.branch(['-r']);
+            const remoteBranchName = `origin/${branch}`;
+            return remoteBranches.all.includes(remoteBranchName);
         } catch {
             return false;
         }
@@ -199,6 +203,24 @@ export const gitUtils = (git: SimpleGit) => ({
     
     fetch: async (): Promise<void> => {
         await git.fetch();
+    },
+
+    fetchIfNeeded: async (): Promise<boolean> => {
+        try {
+            const repoPath = await gitUtils(git).findGitRoot(process.cwd());
+            const cacheManager = fetchCacheManager(fs);
+
+            if (await cacheManager.shouldFetch(repoPath)) {
+                await git.fetch();
+                await cacheManager.updateFetchTimestamp(repoPath);
+                return true; // Fetch was performed
+            }
+
+            return false; // Fetch was skipped (cache valid)
+        } catch {
+            // If anything fails, skip fetch silently
+            return false;
+        }
     },
     
     hasRemotes: async (): Promise<boolean> => {

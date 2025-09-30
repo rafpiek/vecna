@@ -18,6 +18,9 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
     const manager = worktreeManager(gitInstance);
 
     try {
+        // Fetch remote branch info if needed (cached for 15 minutes)
+        await git.fetchIfNeeded();
+
         // Get all worktrees
         const allWorktrees = await manager.listWorktrees();
         
