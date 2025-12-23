@@ -35,6 +35,19 @@ export default async (gitInstance: SimpleGit, config: ConfigManager) => {
                 default: 'main',
             },
             {
+                type: 'list',
+                name: 'packageManager',
+                message: 'Select package manager:',
+                choices: [
+                    { name: 'npm', value: 'npm' },
+                    { name: 'yarn', value: 'yarn' },
+                    { name: 'pnpm', value: 'pnpm' },
+                    { name: 'bun', value: 'bun' },
+                    { name: 'auto (detect from lock files)', value: 'auto' },
+                ],
+                default: 'auto',
+            },
+            {
                 type: 'input',
                 name: 'jsLinter',
                 message: 'Enter the JavaScript/TypeScript linter command (optional):',
@@ -70,7 +83,7 @@ export default async (gitInstance: SimpleGit, config: ConfigManager) => {
                 copyFiles: ['config/master.key', 'config/application.yml'],
                 defaultBranch: answers.mainBranch,
                 autoInstall: true,
-                packageManager: 'auto',
+                packageManager: answers.packageManager,
                 postCreateScripts: [],
                 editor: {
                     command: 'code',

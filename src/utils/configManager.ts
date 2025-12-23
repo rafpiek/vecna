@@ -23,7 +23,7 @@ export interface ProjectConfig {
         copyPatterns?: string[];
         defaultBranch?: string;
         autoInstall?: boolean;
-        packageManager?: 'yarn' | 'npm' | 'pnpm' | 'auto';
+        packageManager?: 'yarn' | 'npm' | 'pnpm' | 'bun' | 'auto';
         postCreateScripts?: string[];
         editor?: {
             command?: string;

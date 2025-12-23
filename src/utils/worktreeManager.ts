@@ -242,12 +242,14 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
             return;
         }
 
-        // Detect package manager - prioritize yarn, then pnpm, then npm
+        // Detect package manager - check lock files first, then fallback
         let packageManager = 'npm';
         if (await fs.pathExists(path.join(targetPath, 'yarn.lock'))) {
             packageManager = 'yarn';
         } else if (await fs.pathExists(path.join(targetPath, 'pnpm-lock.yaml'))) {
             packageManager = 'pnpm';
+        } else if (await fs.pathExists(path.join(targetPath, 'bun.lockb'))) {
+            packageManager = 'bun';
         } else {
             // Check if yarn is available globally as preferred package manager
             try {
