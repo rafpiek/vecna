@@ -42,7 +42,6 @@ export const gitUtils = (git: SimpleGit) => ({
         await git.raw('worktree', 'add', path, branch);
     },
     addWorktreeWithNewBranch: async (path: string, branch: string, from: string = 'HEAD'): Promise<void> => {
-        console.log(`DEBUG: Executing: git worktree add -b ${branch} ${path} ${from}`);
         await git.raw('worktree', 'add', '-b', branch, path, from);
     },
     removeWorktree: async (path: string, force?: boolean): Promise<void> => {

@@ -57,14 +57,12 @@ interface StartOptions {
 }
 
 export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
-    console.log('DEBUG: START COMMAND CALLED');
     const git = gitUtils(gitInstance);
     const manager = worktreeManager(gitInstance);
     const config = configManager(fs);
     
     // Get current branch BEFORE switching directories
     const originalCurrentBranch = await git.getCurrentBranch();
-    console.log(`DEBUG: originalCurrentBranch detected as: '${originalCurrentBranch}'`);
     
     // Determine project context
     const projectContext = await getProjectContext(gitInstance, config);
@@ -88,12 +86,7 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
     // Handle source branch selection BEFORE creating tasks
     let fromBranch = options.from;
     if (!fromBranch) {
-        console.log(`DEBUG: No --from option provided, need to choose source branch`);
-        console.log(`DEBUG: Current branch is: ${originalCurrentBranch}`);
-        
-        // For now, let's just default to the original current branch to test
         fromBranch = originalCurrentBranch;
-        console.log(`DEBUG: Set fromBranch to current branch: ${fromBranch}`);
     }
     
     const shouldInstall = options.install !== false;
@@ -141,7 +134,6 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
                 
                 // Check if source branch exists in main repo
                 const sourceBranchExists = await git.branchExists(fromBranch);
-                console.log(`DEBUG: sourceBranchExists('${fromBranch}') = ${sourceBranchExists}`);
                 
                 if (!sourceBranchExists && fromBranch !== 'main') {
                     // The branch doesn't exist in main repo, but it might exist as a remote or worktree branch
@@ -188,7 +180,6 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
                 if (!branchName || !fromBranch) {
                     throw new Error('Branch name and source branch are required');
                 }
-                console.log(`DEBUG: Creating worktree '${branchName}' from source branch '${fromBranch}'`);
                 await manager.create(branchName, fromBranch);
                 ctx.worktreeCreated = true;
             },
@@ -209,9 +200,7 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
     ]);
 
     try {
-        console.log('DEBUG: About to run tasks');
         const ctx = await tasks.run();
-        console.log('DEBUG: Tasks completed successfully');
 
         console.log('\n' + chalk.green('✓') + ' Worktree created successfully!');
         console.log('\nLocation: ' + chalk.cyan(ctx.worktreePath));
