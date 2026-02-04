@@ -40,8 +40,9 @@ export default async (gitInstance: SimpleGit, options: CleanOptions = {}) => {
             }
         }
 
-        // Also check for directories in ~/dev/trees that aren't registered worktrees
-        const baseDir = require('os').homedir() + '/dev/trees';
+        // Also check for directories in .worktrees that aren't registered worktrees
+        const gitRoot = await git.findGitRoot(process.cwd());
+        const baseDir = `${gitRoot}/.worktrees`;
         let unregisteredDirs = [];
 
         if (await fs.pathExists(baseDir)) {
