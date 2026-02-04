@@ -22,6 +22,7 @@ worktreeCommand
     .command('remove [name]')
     .description('Remove a worktree')
     .option('-f, --force', 'Skip confirmation prompts')
+    .option('-m, --multi', 'Select multiple worktrees to remove')
     .option('--all-unused', 'Remove all unused worktrees')
     .option('--gone', 'List only worktrees that no longer exist on disk')
     .action((name, options) => {

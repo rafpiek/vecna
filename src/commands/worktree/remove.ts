@@ -1,7 +1,7 @@
 import { SimpleGit } from 'simple-git';
 import { gitUtils } from '../../utils/git';
 import { worktreeManager } from '../../utils/worktreeManager';
-import { selectWorktreeWithFuzzySearch } from '../../utils/worktreePicker';
+import { selectWorktreeWithFuzzySearch, selectMultipleWorktrees } from '../../utils/worktreePicker';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import fs from 'fs-extra';
@@ -9,6 +9,7 @@ import path from 'path';
 
 interface RemoveOptions {
     force?: boolean;
+    multi?: boolean;
     allUnused?: boolean;
     gone?: boolean;
 }
@@ -83,6 +84,48 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
                 process.exit(1);
             }
             worktreesToRemove = [worktree];
+
+        } else if (options.multi) {
+            // Multi-select mode: force remove without prompts
+            const availableWorktrees = worktrees.filter(wt => !wt.isCurrent);
+
+            if (availableWorktrees.length === 0) {
+                console.log(chalk.yellow('No worktrees available for removal (cannot remove current worktree).'));
+                return;
+            }
+
+            const selectedWorktrees = await selectMultipleWorktrees(availableWorktrees, 'Select worktrees to remove:');
+
+            if (selectedWorktrees.length === 0) {
+                console.log(chalk.gray('No worktrees selected.'));
+                return;
+            }
+
+            // Force remove all selected worktrees without prompts
+            let removedCount = 0;
+            for (const worktree of selectedWorktrees) {
+                try {
+                    await git.removeWorktree(worktree.path, true);
+                    console.log(chalk.green(`✓ Removed worktree ${worktree.branch}`));
+
+                    try {
+                        await git.deleteBranch(worktree.branch, true);
+                        console.log(chalk.green(`✓ Deleted local branch ${worktree.branch}`));
+                    } catch (branchError) {
+                        const branchErrorMessage = branchError instanceof Error ? branchError.message : String(branchError);
+                        console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
+                    }
+
+                    await manager.cleanWorktreeState(worktree.name);
+                    removedCount++;
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    console.error(chalk.red(`✗ Failed to remove ${worktree.branch}: ${errorMessage}`));
+                }
+            }
+
+            console.log(chalk.cyan(`\nRemoved ${removedCount} of ${selectedWorktrees.length} worktrees.`));
+            return;
 
         } else {
             // Interactive selection with fuzzy search

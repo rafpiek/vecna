@@ -1,4 +1,4 @@
-import { search } from '@inquirer/prompts';
+import { search, checkbox } from '@inquirer/prompts';
 import path from 'path';
 import chalk from 'chalk';
 
@@ -56,6 +56,27 @@ export async function selectWorktreeWithFuzzySearch(worktrees: any[], message: s
             
             return filtered;
         }
+    });
+
+    return selected;
+}
+
+export async function selectMultipleWorktrees(worktrees: any[], message: string = 'Select worktrees to remove:'): Promise<any[]> {
+    const choices = worktrees.map((wt) => {
+        const dirName = path.basename(wt.path);
+        const statusIndicator = getStatusIndicator(wt);
+        const statusSuffix = getStatusSuffix(wt);
+        const displayName = `${statusIndicator}${dirName}${statusSuffix}`;
+
+        return {
+            name: displayName,
+            value: wt
+        };
+    });
+
+    const selected = await checkbox({
+        message,
+        choices
     });
 
     return selected;
