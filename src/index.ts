@@ -20,8 +20,8 @@ program
 
 program
     .command('setup')
-    .description('setup a new project')
-    .action(() => import('./commands/setup').then(i => i.default(gitInstance, config)));
+    .description('Setup vecna for this repository')
+    .action(() => import('./commands/setup').then(i => i.default(gitInstance)));
 
 program
     .command('start')

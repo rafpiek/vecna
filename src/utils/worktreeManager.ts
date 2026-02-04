@@ -1,6 +1,5 @@
 import { simpleGit } from 'simple-git';
 import { gitUtils } from './git';
-import { homedir } from 'os';
 import path from 'path';
 import fs from 'fs-extra';
 import execa from 'execa';
@@ -53,7 +52,9 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
     const config = configManager(fs);
 
     const create = async (branchName: string, fromBranch: string = 'main'): Promise<void> => {
-        const worktreeDir = path.join(homedir(), 'dev', 'trees');
+        // Get git root to find .worktrees directory
+        const gitRoot = await gitRepo.findGitRoot(process.cwd());
+        const worktreeDir = path.join(gitRoot, '.worktrees');
         const worktreeName = branchName.replace(/\//g, '-');
         const worktreePath = path.join(worktreeDir, worktreeName);
 
@@ -96,7 +97,9 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
 
     const createWorktree = async (branchName: string, options: CreateOptions = {}): Promise<WorktreeInfo> => {
         const { from = 'main', noInstall = false } = options;
-        const worktreeDir = path.join(homedir(), 'dev', 'trees');
+        // Get git root to find .worktrees directory
+        const gitRoot = await gitRepo.findGitRoot(process.cwd());
+        const worktreeDir = path.join(gitRoot, '.worktrees');
         const worktreePath = path.join(worktreeDir, branchName.replace(/\//g, '-'));
 
         if (fs.existsSync(worktreePath)) {
@@ -214,69 +217,111 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
 
     const runPostCreateScripts = async (targetPath: string): Promise<void> => {
         const localConfig = await config.readLocalConfig();
+        const steps: string[] = [];
 
-        // Procfile.dev port modification removed - no longer needed
-
-        // Check if package.json exists before attempting to install dependencies
+        // Detect and install Node.js dependencies
         const packageJsonPath = path.join(targetPath, 'package.json');
-        if (!(await fs.pathExists(packageJsonPath))) {
-            console.log('  No package.json found, skipping dependency installation');
+        const hasPackageJson = await fs.pathExists(packageJsonPath);
 
-            // Still run custom post-create scripts and auto-open
-            const postCreateScripts = localConfig?.worktrees?.postCreateScripts || [];
-            for (const script of postCreateScripts) {
-                console.log(`  Running: ${script}`);
-                const [command, ...args] = script.split(' ');
-                await execa(command, args, {
-                    cwd: targetPath,
-                    stdio: 'inherit'
-                });
-            }
-
-            await handleAutoOpenInCursor(targetPath, localConfig);
-            return;
-        }
-
-        // Detect package manager - check lock files first, then fallback
-        let packageManager = 'npm';
-        if (await fs.pathExists(path.join(targetPath, 'yarn.lock'))) {
-            packageManager = 'yarn';
-        } else if (await fs.pathExists(path.join(targetPath, 'pnpm-lock.yaml'))) {
-            packageManager = 'pnpm';
-        } else if (await fs.pathExists(path.join(targetPath, 'bun.lockb'))) {
-            packageManager = 'bun';
-        } else {
-            // Check if yarn is available globally as preferred package manager
-            try {
-                await execa('yarn', ['--version'], { stdio: 'ignore' });
+        if (hasPackageJson) {
+            // Auto-detect package manager by checking lock files in priority order: bun → pnpm → yarn → npm
+            let packageManager = 'npm';
+            if (await fs.pathExists(path.join(targetPath, 'bun.lockb'))) {
+                packageManager = 'bun';
+            } else if (await fs.pathExists(path.join(targetPath, 'pnpm-lock.yaml'))) {
+                packageManager = 'pnpm';
+            } else if (await fs.pathExists(path.join(targetPath, 'yarn.lock'))) {
                 packageManager = 'yarn';
-            } catch {
-                // Fall back to npm if yarn is not available
-                packageManager = 'npm';
+            } else {
+                // No lock file - check if package managers are available in priority order
+                const managers = ['bun', 'pnpm', 'yarn', 'npm'];
+                for (const pm of managers) {
+                    try {
+                        await execa(pm, ['--version'], { stdio: 'ignore' });
+                        packageManager = pm;
+                        break;
+                    } catch {
+                        // Continue to next package manager
+                    }
+                }
+            }
+
+            try {
+                await execa(packageManager, ['install'], {
+                    cwd: targetPath,
+                    stdio: 'pipe'
+                });
+                steps.push(`${packageManager} install`);
+            } catch (error) {
+                const err = error as any;
+                throw new Error(`${packageManager} install failed: ${err.stderr || err.message}`);
             }
         }
 
-        // Override with config if specified
-        if (localConfig?.worktrees?.packageManager && localConfig.worktrees.packageManager !== 'auto') {
-            packageManager = localConfig.worktrees.packageManager;
+        // Detect and install Ruby/Rails dependencies
+        const gemfilePath = path.join(targetPath, 'Gemfile');
+        const hasGemfile = await fs.pathExists(gemfilePath);
+        const isRailsProject = hasGemfile && await fs.pathExists(path.join(targetPath, 'config', 'application.rb'));
+
+        if (hasGemfile) {
+            try {
+                await execa('bundle', ['install'], {
+                    cwd: targetPath,
+                    stdio: 'pipe'
+                });
+                steps.push('bundle install');
+            } catch (error) {
+                const err = error as any;
+                throw new Error(`bundle install failed: ${err.stderr || err.message}`);
+            }
         }
 
-        // Run package manager install
-        console.log(`  Running ${packageManager} install...`);
-        await execa(packageManager, ['install'], {
-            cwd: targetPath,
-            stdio: 'inherit'
-        });
+        // For Rails projects: run migrations and reset schema
+        if (isRailsProject) {
+            try {
+                await execa('bundle', ['exec', 'rails', 'db:migrate'], {
+                    cwd: targetPath,
+                    stdio: 'pipe'
+                });
+                steps.push('rails db:migrate');
 
-        // Run any custom post-create scripts
+                // Reset schema changes to keep the worktree clean
+                const schemaFiles = ['db/schema.rb', 'db/structure.sql'];
+                for (const schemaFile of schemaFiles) {
+                    const schemaPath = path.join(targetPath, schemaFile);
+                    if (await fs.pathExists(schemaPath)) {
+                        await execa('git', ['checkout', '--', schemaFile], {
+                            cwd: targetPath,
+                            stdio: 'pipe'
+                        });
+                        steps.push(`reset ${schemaFile}`);
+                    }
+                }
+            } catch (error) {
+                // Migration failures are non-fatal - user can run manually
+                steps.push('rails db:migrate (failed - run manually)');
+            }
+        }
+
+        // Run any custom post-create scripts from config
         const postCreateScripts = localConfig?.worktrees?.postCreateScripts || [];
         for (const script of postCreateScripts) {
-            console.log(`  Running: ${script}`);
             const [command, ...args] = script.split(' ');
-            await execa(command, args, {
-                cwd: targetPath,
-                stdio: 'inherit'
-            });
+            try {
+                await execa(command, args, {
+                    cwd: targetPath,
+                    stdio: 'pipe'
+                });
+                steps.push(script);
+            } catch (error) {
+                const err = error as any;
+                throw new Error(`Script "${script}" failed: ${err.stderr || err.message}`);
+            }
+        }
+
+        // Log completed steps
+        if (steps.length > 0) {
+            console.log(`  Completed: ${steps.join(', ')}`);
         }
 
         // Auto-open in Cursor if configured

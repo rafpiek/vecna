@@ -1,105 +1,91 @@
 #!/usr/bin/env node
 
-import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import path from 'path';
 import { SimpleGit } from 'simple-git';
-import { configManager, ProjectConfig } from '../utils/configManager';
 import { gitUtils } from '../utils/git';
+import { shellIntegration } from '../utils/shellIntegration';
+import chalk from 'chalk';
 
-type ConfigManager = ReturnType<typeof configManager>;
+async function appendToIgnoreFile(filePath: string, entry: string): Promise<boolean> {
+    let content = '';
+    if (await fs.pathExists(filePath)) {
+        content = await fs.readFile(filePath, 'utf-8');
+    }
 
-export default async (gitInstance: SimpleGit, config: ConfigManager) => {
+    // Check if entry already exists
+    const lines = content.split('\n');
+    if (lines.includes(entry)) {
+        return false; // Already exists
+    }
+
+    // Add newline if file doesn't end with one
+    if (content && !content.endsWith('\n')) {
+        content += '\n';
+    }
+    content += entry + '\n';
+    await fs.writeFile(filePath, content);
+    return true;
+}
+
+export default async (gitInstance: SimpleGit) => {
     const git = gitUtils(gitInstance);
+
     try {
         // Find git root directory
         const gitRoot = await git.findGitRoot(process.cwd());
-        
+
         // Verify this is the main repository (not a worktree)
         const isMainRepo = await git.isMainRepository(gitRoot);
-        
+
         if (!isMainRepo) {
             throw new Error('Setup must be run from the main repository directory, not a worktree');
         }
-        const answers = await inquirer.prompt([
-            {
-                type: 'input',
-                name: 'projectName',
-                message: 'Enter the project name:',
-                default: path.basename(gitRoot),
-            },
-            {
-                type: 'input',
-                name: 'mainBranch',
-                message: 'Enter the main branch name:',
-                default: 'main',
-            },
-            {
-                type: 'list',
-                name: 'packageManager',
-                message: 'Select package manager:',
-                choices: [
-                    { name: 'npm', value: 'npm' },
-                    { name: 'yarn', value: 'yarn' },
-                    { name: 'pnpm', value: 'pnpm' },
-                    { name: 'bun', value: 'bun' },
-                    { name: 'auto (detect from lock files)', value: 'auto' },
-                ],
-                default: 'auto',
-            },
-            {
-                type: 'input',
-                name: 'jsLinter',
-                message: 'Enter the JavaScript/TypeScript linter command (optional):',
-                default: 'eslint',
-            },
-            {
-                type: 'input',
-                name: 'rbLinter',
-                message: 'Enter the Ruby linter command (optional):',
-                default: 'rubocop',
-            },
-            {
-                type: 'input',
-                name: 'rbTestRunner',
-                message: 'Enter the Ruby test runner command (optional):',
-                default: 'rspec',
-            },
-        ]);
 
-        const projectConfig: ProjectConfig = {
-            name: answers.projectName,
-            path: gitRoot,
-            mainBranch: answers.mainBranch,
-            linter: {
-                js: answers.jsLinter || undefined,
-                rb: answers.rbLinter || undefined,
-            },
-            test: {
-                rb: answers.rbTestRunner || undefined,
-            },
-            worktrees: {
-                baseDir: path.join(require('os').homedir(), 'dev', 'trees'),
-                copyFiles: ['config/master.key', 'config/application.yml'],
-                defaultBranch: answers.mainBranch,
-                autoInstall: true,
-                packageManager: answers.packageManager,
-                postCreateScripts: [],
-                editor: {
-                    command: 'code',
-                    openOnSwitch: false
-                }
-            },
-            worktreeState: {}
-        };
+        console.log(chalk.cyan.bold('🔧 Vecna Setup\n'));
 
-        // Write local config
-        await config.writeLocalConfig(projectConfig);
+        // 1. Create .worktrees directory
+        const worktreesDir = path.join(gitRoot, '.worktrees');
+        await fs.ensureDir(worktreesDir);
+        console.log(chalk.green('✓') + ' Created .worktrees directory');
 
-        // Update global config
-        await config.updateGlobalConfig(projectConfig);
+        // 2. Add .worktrees to .gitignore
+        const gitignorePath = path.join(gitRoot, '.gitignore');
+        const addedToGitignore = await appendToIgnoreFile(gitignorePath, '.worktrees');
+        if (addedToGitignore) {
+            console.log(chalk.green('✓') + ' Added .worktrees to .gitignore');
+        } else {
+            console.log(chalk.gray('·') + ' .worktrees already in .gitignore');
+        }
 
-        console.log(`Project ${answers.projectName} setup complete.`);
+        // 3. Add .worktrees to .cursorignore
+        const cursorignorePath = path.join(gitRoot, '.cursorignore');
+        const addedToCursorignore = await appendToIgnoreFile(cursorignorePath, '.worktrees');
+        if (addedToCursorignore) {
+            console.log(chalk.green('✓') + ' Added .worktrees to .cursorignore');
+        } else {
+            console.log(chalk.gray('·') + ' .worktrees already in .cursorignore');
+        }
+
+        // 4. Install shell integration
+        console.log('');
+        const shell = shellIntegration.detectShell();
+        const configPath = shellIntegration.getShellConfigPath();
+
+        console.log(`Detected shell: ${chalk.yellow(shell)}`);
+
+        try {
+            await shellIntegration.installShellIntegration();
+            console.log(chalk.green('✓') + ' Shell integration installed');
+        } catch {
+            console.log(chalk.gray('·') + ' Shell integration already installed');
+        }
+
+        console.log(chalk.green.bold('\n✓ Setup complete!'));
+        console.log('\nTo start using vecna:');
+        console.log(chalk.yellow(`  1. Restart your terminal, or run: source ${configPath}`));
+        console.log(chalk.yellow('  2. Create a worktree: vecna start <branch-name>'));
+        console.log(chalk.yellow('  3. Switch worktrees: vecna-switch'));
 
     } catch (error) {
         console.error('Setup failed:', error);

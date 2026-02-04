@@ -5,7 +5,6 @@ import { worktreeManager } from '../utils/worktreeManager';
 import { SimpleGit } from 'simple-git';
 import chalk from 'chalk';
 import path from 'path';
-import { homedir } from 'os';
 import fs from 'fs-extra';
 import { configManager } from '../utils/configManager';
 import { spawn } from 'child_process';
@@ -112,12 +111,13 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
                 if (!branchName) {
                     throw new Error('Branch name is required');
                 }
-                
-                // Generate worktree path
-                const worktreeDir = path.join(homedir(), 'dev', 'trees');
+
+                // Generate worktree path within .worktrees directory
+                const gitRoot = await git.findGitRoot(process.cwd());
+                const worktreeDir = path.join(gitRoot, '.worktrees');
                 const worktreeName = branchName.replace(/\//g, '-');
                 const worktreePath = path.join(worktreeDir, worktreeName);
-                
+
                 ctx.branchName = branchName;
                 ctx.worktreePath = worktreePath;
             },
@@ -230,16 +230,27 @@ export default async (gitInstance: SimpleGit, options: StartOptions = {}) => {
 };
 
 async function getProjectContext(gitInstance: SimpleGit, config: any) {
-    // Check if we're in a directory with .vecna.json (local project)
     const currentDir = process.cwd();
+
+    // Check if we're in a directory with .vecna.json (local project)
     const vecnaConfigPath = path.join(currentDir, '.vecna.json');
-    
     if (await fs.pathExists(vecnaConfigPath)) {
         const localConfig = await fs.readJson(vecnaConfigPath);
         return {
             name: localConfig.name,
             path: currentDir,
             isLocal: true
+        };
+    }
+
+    // Check if we're in a git repository (auto-detect project)
+    const gitDirPath = path.join(currentDir, '.git');
+    if (await fs.pathExists(gitDirPath)) {
+        const projectName = path.basename(currentDir);
+        return {
+            name: projectName,
+            path: currentDir,
+            isAutoDetected: true
         };
     }
 
