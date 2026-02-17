@@ -148,14 +148,35 @@ export const gitUtils = (git: SimpleGit) => ({
     // New functions for tidy command
     findGitRoot: async (startPath: string): Promise<string> => {
         let currentPath = path.resolve(startPath);
-        
+
         while (currentPath !== path.dirname(currentPath)) {
-            if (await fs.pathExists(path.join(currentPath, '.git'))) {
-                return currentPath;
+            const gitPath = path.join(currentPath, '.git');
+            if (await fs.pathExists(gitPath)) {
+                const stat = await fs.stat(gitPath);
+                if (stat.isDirectory()) {
+                    // Main repository - .git is a directory
+                    return currentPath;
+                }
+                // Worktree - .git is a file containing "gitdir: <path>"
+                // Resolve to the main repo root
+                const content = await fs.readFile(gitPath, 'utf8');
+                const match = content.match(/^gitdir:\s*(.+)$/m);
+                if (match) {
+                    const gitDir = path.resolve(currentPath, match[1].trim());
+                    // gitDir is like: <main-repo>/.git/worktrees/<name>
+                    // Walk up to find the .git directory, then return its parent
+                    let dir = gitDir;
+                    while (dir !== path.dirname(dir)) {
+                        if (path.basename(dir) === '.git') {
+                            return path.dirname(dir);
+                        }
+                        dir = path.dirname(dir);
+                    }
+                }
             }
             currentPath = path.dirname(currentPath);
         }
-        
+
         throw new Error('Not in a git repository');
     },
     
