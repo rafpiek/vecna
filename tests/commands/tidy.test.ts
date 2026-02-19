@@ -62,7 +62,6 @@ describe('tidy command', () => {
         
         manager = {
             listWorktrees: jest.fn(),
-            cleanWorktreeState: jest.fn(),
         };
         
         config = {

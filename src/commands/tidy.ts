@@ -269,7 +269,6 @@ async function executeCleanup(
             
             if (!options.dryRun) {
                 await git.removeWorktree(worktree.path, true); // force=true
-                await manager.cleanWorktreeState(worktree.name);
             }
             
             const action = options.dryRun ? 'Would remove' : 'Removed';

@@ -31,15 +31,6 @@ export interface ProjectConfig {
             preferCursor?: boolean;
         };
     };
-    worktreeState?: {
-        [treeName: string]: {
-            branch: string;
-            path: string;
-            createdAt: string;
-            lastAccessedAt: string;
-            customConfig?: any;
-        };
-    };
 }
 
 export interface GlobalConfig {
@@ -103,73 +94,6 @@ export function configManager(fs: any) {
             } catch (error) {
                 console.error('Error writing local config:', error);
                 throw error;
-            }
-        },
-
-        updateWorktreeState: async (treeName: string, state: {
-            branch: string;
-            path: string;
-            createdAt?: string;
-            lastAccessedAt?: string;
-            customConfig?: any;
-        }): Promise<void> => {
-            try {
-                let config = await configManager(fs).readLocalConfig();
-                if (!config) {
-                    throw new Error('No .vecna.json found. Run "vecna setup" first.');
-                }
-
-                if (!config.worktreeState) {
-                    config.worktreeState = {};
-                }
-
-                config.worktreeState[treeName] = {
-                    branch: state.branch,
-                    path: state.path,
-                    createdAt: state.createdAt || new Date().toISOString(),
-                    lastAccessedAt: state.lastAccessedAt || new Date().toISOString(),
-                    customConfig: state.customConfig
-                };
-
-                await configManager(fs).writeLocalConfig(config);
-            } catch (error) {
-                console.error('Error updating worktree state:', error);
-                throw error;
-            }
-        },
-
-        getWorktreeState: async (treeName: string): Promise<any> => {
-            try {
-                const config = await configManager(fs).readLocalConfig();
-                return config?.worktreeState?.[treeName] || null;
-            } catch (error) {
-                console.error('Error getting worktree state:', error);
-                return null;
-            }
-        },
-
-        removeWorktreeState: async (treeName: string): Promise<void> => {
-            try {
-                let config = await configManager(fs).readLocalConfig();
-                if (!config || !config.worktreeState) {
-                    return;
-                }
-
-                delete config.worktreeState[treeName];
-                await configManager(fs).writeLocalConfig(config);
-            } catch (error) {
-                console.error('Error removing worktree state:', error);
-                throw error;
-            }
-        },
-
-        getAllWorktreeStates: async (): Promise<{ [key: string]: any }> => {
-            try {
-                const config = await configManager(fs).readLocalConfig();
-                return config?.worktreeState || {};
-            } catch (error) {
-                console.error('Error getting all worktree states:', error);
-                return {};
             }
         }
     };

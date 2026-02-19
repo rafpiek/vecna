@@ -41,10 +41,6 @@ interface WorktreeManager {
   getWorktreeInfo(name: string): Promise<WorktreeInfo>;
   copyConfigFiles(targetPath: string, patterns?: string[]): Promise<void>;
   runPostCreateScripts(path: string): Promise<void>;
-  saveWorktreeState(info: WorktreeInfo): Promise<void>;
-  getWorktreeState(name: string): Promise<any>;
-  cleanOrphanedStates(): Promise<void>;
-  cleanWorktreeState(name: string): Promise<void>;
 }
 
 export const worktreeManager = (git = simpleGit()): WorktreeManager => {
@@ -73,26 +69,6 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         } else {
             await gitRepo.addWorktreeWithNewBranch(worktreePath, branchName, fromBranch);
         }
-
-        // Save worktree state
-        await saveWorktreeState({
-            name: worktreeName,
-            branch: branchName,
-            path: worktreePath,
-            isActive: true,
-            isCurrent: false,
-            lastCommit: {
-                hash: '',
-                message: '',
-                date: new Date()
-            },
-            status: {
-                hasUncommittedChanges: false,
-                ahead: 0,
-                behind: 0,
-                remoteExists: true
-            }
-        });
     };
 
     const createWorktree = async (branchName: string, options: CreateOptions = {}): Promise<WorktreeInfo> => {
@@ -356,48 +332,12 @@ export const worktreeManager = (git = simpleGit()): WorktreeManager => {
         }
     };
 
-
-    const saveWorktreeState = async (info: WorktreeInfo): Promise<void> => {
-        await config.updateWorktreeState(info.name, {
-            branch: info.branch,
-            path: info.path,
-            createdAt: new Date().toISOString(),
-            lastAccessedAt: new Date().toISOString()
-        });
-    };
-
-    const getWorktreeState = async (name: string): Promise<any> => {
-        return await config.getWorktreeState(name);
-    };
-
-    const cleanOrphanedStates = async (): Promise<void> => {
-        const allStates = await config.getAllWorktreeStates();
-        const gitWorktrees = await gitRepo.listWorktrees();
-        const validPaths = new Set(gitWorktrees.map(wt => wt.path));
-
-        for (const [name, state] of Object.entries(allStates)) {
-            if (!validPaths.has((state as any).path)) {
-                await config.removeWorktreeState(name);
-                console.log(`Cleaned orphaned state for: ${name}`);
-            }
-        }
-    };
-
-    const cleanWorktreeState = async (name: string): Promise<void> => {
-        await config.removeWorktreeState(name);
-    };
-
     return {
         create,
         createWorktree,
         listWorktrees,
         copyConfigFiles,
-        runPostCreateScripts,
-        saveWorktreeState,
-        getWorktreeState,
-        cleanOrphanedStates,
-        cleanWorktreeState,
-        // ... other functions will be implemented later
+        runPostCreateScripts
     } as WorktreeManager;
 };
 // Implementations will be added in subsequent steps.

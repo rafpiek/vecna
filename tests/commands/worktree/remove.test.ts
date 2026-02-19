@@ -38,7 +38,6 @@ describe('worktree remove command', () => {
         };
         manager = {
             listWorktrees: jest.fn(),
-            cleanWorktreeState: jest.fn(),
         };
         mockedGitUtils.mockReturnValue(git);
         mockedWorktreeManager.mockReturnValue(manager);
@@ -87,7 +86,6 @@ describe('worktree remove command', () => {
         await removeCommand({} as any, 'feature-test');
 
         expect(git.removeWorktree).toHaveBeenCalledWith('/Users/test/dev/trees/feature-test', undefined);
-        expect(manager.cleanWorktreeState).toHaveBeenCalledWith('feature-test');
     });
 
     it('should handle interactive selection', async () => {

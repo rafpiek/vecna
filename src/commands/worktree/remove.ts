@@ -116,7 +116,6 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
                         console.log(chalk.yellow(`⚠️  Could not delete local branch ${worktree.branch}: ${branchErrorMessage}`));
                     }
 
-                    await manager.cleanWorktreeState(worktree.name);
                     removedCount++;
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -238,9 +237,6 @@ export default async (gitInstance: SimpleGit, worktreeName?: string, options: Re
                         console.log(chalk.gray(`You may need to delete it manually: git branch -D ${worktree.branch}`));
                     }
                 }
-
-                // Clean up any remaining state
-                await manager.cleanWorktreeState(worktree.name);
 
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
